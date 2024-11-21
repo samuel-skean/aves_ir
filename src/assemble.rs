@@ -1,4 +1,4 @@
-use nom::{branch::alt, bytes::complete::{is_a, tag_no_case, take_while}, character::{complete::{alphanumeric1, space1}, is_alphabetic, is_alphanumeric}, sequence::tuple, IResult};
+use nom::{branch::alt, bytes::complete::{tag_no_case, take_while}, character::{complete::space1, is_alphanumeric}, sequence::tuple, IResult};
 
 use crate::ir_definition::{IrNode, Label};
 type ParseResult<'a> = IResult<&'a [u8], IrNode>;
@@ -73,22 +73,22 @@ fn and(input: &[u8]) -> ParseResult {
 }
 
 fn eq(input: &[u8]) -> ParseResult {
-    let (rest, _) = tuple((tag_no_case(b"EQ"), space1))(input)?;
+    let (rest, _) = tag_no_case(b"EQ")(input)?;
     Ok((rest, IrNode::Eq))
 }
 
 fn lt(input: &[u8]) -> ParseResult {
-    let (rest, _) = tuple((tag_no_case(b"LT"), space1))(input)?;
+    let (rest, _) = tag_no_case(b"LT")(input)?;
     Ok((rest, IrNode::Lt))
 }
 
 fn gt(input: &[u8]) -> ParseResult {
-    let (rest, _) = tuple((tag_no_case(b"GT"), space1))(input)?;
+    let (rest, _) = tag_no_case(b"GT")(input)?;
     Ok((rest, IrNode::Gt))
 }
 
 fn not(input: &[u8]) -> ParseResult {
-    let (rest, _) = tuple((tag_no_case(b"NOT"), space1))(input)?;
+    let (rest, _) = tag_no_case(b"NOT")(input)?;
     Ok((rest, IrNode::Not))
 }
 
@@ -107,10 +107,29 @@ mod tests {
     }
 
     #[test]
-    fn no_arg_nodes() {
-        // This is known to be incomplete, it would be very boring to complete it.
+    fn noarg_nodes() {
+        // I never know how many tests to write...
+        // Positive examples:
         assert_eq!(instruction(b"ADD "), Ok((&b" "[..], IrNode::Add)));
         assert_eq!(instruction(b"NOP"), Ok((&b""[..], IrNode::Nop)));
+        assert_eq!(instruction(b"sUb   kdf"), Ok((&b"   kdf"[..], IrNode::Sub)));
+        assert_eq!(instruction(b"Mul "), Ok((&b" "[..], IrNode::Mul)));
+        assert_eq!(instruction(b"diV  "), Ok((&b"  "[..], IrNode::Div)));
+        assert_eq!(instruction(b"mod  $$04"), Ok((&b"  $$04"[..], IrNode::Mod)));
+        assert_eq!(instruction(b"BOR      \n"), Ok((&b"      \n"[..], IrNode::Bor)));
+        assert_eq!(instruction(b"bANd  "), Ok((&b"  "[..], IrNode::Band)));
+        assert_eq!(instruction(b"xor"), Ok((&b""[..], IrNode::Xor)));
+        assert_eq!(instruction(b"or"), Ok((&b""[..], IrNode::Or)));
+        assert_eq!(instruction(b"and"), Ok((&b""[..], IrNode::And)));
+        assert_eq!(instruction(b"eq"), Ok((&b""[..], IrNode::Eq)));
+        assert_eq!(instruction(b"lT"), Ok((&b""[..], IrNode::Lt)));
+        assert_eq!(instruction(b"gt"), Ok((&b""[..], IrNode::Gt)));
+        assert_eq!(instruction(b"Not"), Ok((&b""[..], IrNode::Not)));
+
+        // Negative examples:
+        assert!(instruction(b"n ot").is_err());
+        assert!(instruction(b" div").is_err()); // Doesn't accept leading whitespace.
+        assert_ne!(instruction(b"bor   "), Ok((&b""[..], IrNode::Bor))); // Doesn't accept trailing whitespace.
     }
 }
 
