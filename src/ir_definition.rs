@@ -1,20 +1,21 @@
-// TODO: Make all String's &str. Requires lifetime shenanigans.
-pub struct Label {
-    name: String,
-}
+// TODO: Make all Vec<u8>'s &str. Requires lifetime shenanigans.
+#[derive(Debug, PartialEq)]
+pub struct Label(pub Vec<u8>);
 
+#[derive(Debug, PartialEq,)]
 pub enum Intrinsic {
     PrintInt,
     PrintString,
     Exit,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum IrNode {
     Nop,
 
     // Arithmetic/logic operations:
     Iconst(u64),
-    Sconst(String),
+    Sconst(Vec<u8>),
     Add,
     Sub,
     Mul,
@@ -31,10 +32,10 @@ pub enum IrNode {
     Not,
 
     // Variables
-    ReserveString {size: u64, name: String, initial_value: String},
-    ReserveInt(String),
-    Read(String),
-    Write(String),
+    ReserveString {size: u64, name: Vec<u8>, initial_value: Vec<u8>},
+    ReserveInt(Vec<u8>),
+    Read(Vec<u8>),
+    Write(Vec<u8>),
     ArgLocalRead(u64),
     ArgLocalWrite(u64),
 
