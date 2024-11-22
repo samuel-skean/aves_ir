@@ -1,17 +1,21 @@
-use nom::{branch::alt, bytes::complete::{tag_no_case, take_while}, character::{complete::{char, space1}, is_alphanumeric}, combinator::{all_consuming, opt}, multi::separated_list0, sequence::tuple, IResult};
+use nom::{
+    branch::alt,
+    bytes::complete::{tag_no_case, take_while},
+    character::{
+        complete::{multispace0, multispace1, space1},
+        is_alphanumeric,
+    },
+    combinator::{all_consuming, opt},
+    multi::separated_list0,
+    sequence::{delimited, tuple},
+    IResult,
+};
 
 use crate::ir_definition::{IrNode, Label};
 type NodeResult<'a> = IResult<&'a [u8], IrNode>;
 
 fn identifier(input: &[u8]) -> IResult<&[u8], &[u8]> {
     take_while(|c| is_alphanumeric(c) || c == b'$' || c == b'_')(input)
-}
-
-fn jump(input: &[u8]) -> NodeResult {
-    let (rest, _) = tuple((tag_no_case(b"JUMP"), space1))(input)?;
-    let (rest, label_text) = identifier(rest)?;
-
-    Ok((rest, IrNode::Jump(Label(label_text.into()))))
 }
 
 // No-arg nodes:
@@ -92,15 +96,28 @@ fn not(input: &[u8]) -> NodeResult {
     Ok((rest, IrNode::Not))
 }
 
+fn jump(input: &[u8]) -> NodeResult {
+    let (rest, _) = tuple((tag_no_case(b"JUMP"), space1))(input)?;
+    let (rest, label_text) = identifier(rest)?;
+
+    Ok((rest, IrNode::Jump(Label(label_text.into()))))
+}
+
 pub fn node(input: &[u8]) -> NodeResult {
-    alt((jump, nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt, not))(input)
+    alt((
+        nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt, not, jump,
+    ))(input)
 }
 
 pub fn program(input: &[u8]) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&[u8]>>> {
     // TODO: Handle the final missing newline. This somehow doesn't work.
-    let (rest, (prog, _final_newline)) = 
-        all_consuming(tuple((separated_list0(char('\n'), node), opt(char('\n')))))(input)?;
-    assert_eq!(rest, &b""[..]);
+    let (rest, prog) = all_consuming(
+        delimited(
+        multispace0,
+        separated_list0(multispace1, node),
+        multispace0,
+    ))(input)?;
+    assert_eq!(rest, &b""[..]); // Surely this is redundant because of how all-consuming works.
     Ok(prog)
 }
 
@@ -110,8 +127,14 @@ mod tests {
 
     #[test]
     fn jump() {
-        assert_eq!(node(b"JUMP L0  h"), Ok((&b"  h"[..], IrNode::Jump(Label(b"L0".into())))));
-        assert_eq!(node(b"JUMP alskdhjfa"), Ok((&b""[..], IrNode::Jump(Label(b"alskdhjfa".into())))));
+        assert_eq!(
+            node(b"JUMP L0  h"),
+            Ok((&b"  h"[..], IrNode::Jump(Label(b"L0".into()))))
+        );
+        assert_eq!(
+            node(b"JUMP alskdhjfa"),
+            Ok((&b""[..], IrNode::Jump(Label(b"alskdhjfa".into()))))
+        );
     }
 
     #[test]
@@ -143,6 +166,12 @@ mod tests {
     #[test]
     fn simple_program() {
         assert_eq!(
+            program(b"band"),
+            Ok(vec![
+                IrNode::Band
+            ])
+        );
+        assert_eq!(
             program(b"band\n\
                      bor\n\
                      and\n\
@@ -166,7 +195,19 @@ mod tests {
                 IrNode::Xor,
             ])
         );
+
+        // Other whitespace:
+        assert_eq!(
+            program(
+                b" band \n \
+                     BOR\n \t\
+                     And \n     \
+                     \txOR \n"
+            ), // Also works with terminating newline.
+            Ok(vec![IrNode::Band, IrNode::Bor, IrNode::And, IrNode::Xor,])
+        );
     }
 }
 
 // TODO: Each instruction function should not take trailing whitespace. That should be left to the thing that processes multiple instructions, that can take newlines and spaces. I think instructions could totally legally be on the same line!
+// For now, I'm actually requiring a newline between them, but I don't know if I need to.

@@ -2,7 +2,7 @@
 #[derive(Debug, PartialEq)]
 pub struct Label(pub Vec<u8>);
 
-#[derive(Debug, PartialEq,)]
+#[derive(Debug, PartialEq)]
 pub enum Intrinsic {
     PrintInt,
     PrintString,
@@ -32,7 +32,11 @@ pub enum IrNode {
     Not,
 
     // Variables
-    ReserveString {size: u64, name: Vec<u8>, initial_value: Vec<u8>},
+    ReserveString {
+        size: u64,
+        name: Vec<u8>,
+        initial_value: Vec<u8>,
+    },
     ReserveInt(Vec<u8>),
     Read(Vec<u8>),
     Write(Vec<u8>),
@@ -45,13 +49,22 @@ pub enum IrNode {
     BranchZero(Label),
 
     // Functions
-    Function {label: Label, num_locs: u64},
-    Call {label: Label, num_vars: u64},
+    Function {
+        label: Label,
+        num_locs: u64,
+    },
+    Call {
+        label: Label,
+        num_vars: u64,
+    },
     Ret,
     Intrinsic(Intrinsic),
 
     // TODO: These have registers specified as immediates. What's up with that?
-    Push {reg: u64}, // I don't think Bluejay would ever generate these.
-    Pop {reg: u64},
-
+    Push {
+        reg: u64,
+    }, // I don't think Bluejay would ever generate these.
+    Pop {
+        reg: u64,
+    },
 }
