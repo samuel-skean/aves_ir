@@ -1,13 +1,13 @@
 use nom::{
     branch::alt,
-    bytes::complete::{tag_no_case, take_while},
+    bytes::complete::{escaped, tag_no_case, take_while},
     character::{
-        complete::{multispace0, multispace1, space1},
+        complete::{multispace0, multispace1, none_of, one_of, space1, u64 as nom_u64},
         is_alphanumeric,
     },
-    combinator::{all_consuming, opt},
+    combinator::all_consuming,
     multi::separated_list0,
-    sequence::{delimited, tuple},
+    sequence::{delimited, terminated},
     IResult,
 };
 
@@ -15,7 +15,27 @@ use crate::ir_definition::{IrNode, Label};
 type NodeResult<'a> = IResult<&'a [u8], IrNode>;
 
 fn identifier(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    // TODO: Make this require there to be at least one thing in the input.
+    // TODO: Could I do this with permutation, and still use strs?
     take_while(|c| is_alphanumeric(c) || c == b'$' || c == b'_')(input)
+}
+
+fn iconst(input: &[u8]) -> NodeResult {
+    let (rest, _) = terminated(tag_no_case("ICONST"), space1)(input)?;
+    let (rest, num) = nom_u64(rest)?;
+    Ok((rest, IrNode::Iconst(num)))
+}
+
+fn sconst(input: &[u8]) -> NodeResult {
+    let (rest, _) = terminated(tag_no_case(b"SCONST"), space1)(input)?;
+    // TODO: This doesn't actually remove the \n. I need to use
+    // escaped_transform to do that, but it really seems to want to produce
+    // strings - probably because the control_char must be a char. Luckily, I
+    // should be able to get the Vec inside that String.
+    let (rest, transformed_text) = escaped(none_of(&b"\\"[..]), '\\', one_of(&b"n"[..]))(rest)?;
+    println!("{rest:?}");
+
+    Ok((rest, IrNode::Sconst(transformed_text.into())))
 }
 
 // No-arg nodes:
@@ -97,7 +117,7 @@ fn not(input: &[u8]) -> NodeResult {
 }
 
 fn jump(input: &[u8]) -> NodeResult {
-    let (rest, _) = tuple((tag_no_case(b"JUMP"), space1))(input)?;
+    let (rest, _) = terminated(tag_no_case(b"JUMP"), space1)(input)?;
     let (rest, label_text) = identifier(rest)?;
 
     Ok((rest, IrNode::Jump(Label(label_text.into()))))
@@ -105,14 +125,14 @@ fn jump(input: &[u8]) -> NodeResult {
 
 pub fn node(input: &[u8]) -> NodeResult {
     alt((
-        nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt, not, jump,
+        iconst, sconst, nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt, not,
+        jump,
     ))(input)
 }
 
 pub fn program(input: &[u8]) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&[u8]>>> {
     // TODO: Handle the final missing newline. This somehow doesn't work.
-    let (rest, prog) = all_consuming(
-        delimited(
+    let (rest, prog) = all_consuming(delimited(
         multispace0,
         separated_list0(multispace1, node),
         multispace0,
@@ -123,6 +143,7 @@ pub fn program(input: &[u8]) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&
 
 #[cfg(test)]
 mod tests {
+    // TODO: Make an assert macro that prints out byte slices as bytes when it fails.
     use super::*;
 
     #[test]
@@ -164,36 +185,40 @@ mod tests {
     }
 
     #[test]
-    fn simple_program() {
+    fn iconst_sconst() {
+        assert_eq!(node(b"ICONST 50"), Ok((&b""[..], IrNode::Iconst(50))));
+        // Here is where I deviate from the format as produced by the printer in ir.h, but all I'm doing is adding one escape sequence to strings: \n, for newline.
         assert_eq!(
-            program(b"band"),
-            Ok(vec![
-                IrNode::Band
-            ])
+            node(br#"SCONST Hello"#),
+            Ok((&b""[..], IrNode::Sconst("Hello".into())))
         );
         assert_eq!(
-            program(b"band\n\
+            node(br#"SCONST Hello\n"#),
+            // TODO: Expect the \n to be transformed away.
+            Ok((&b""[..], IrNode::Sconst("Hello\\n".into())))
+        );
+    }
+
+    #[test]
+    fn simple_program() {
+        assert_eq!(program(b"band"), Ok(vec![IrNode::Band]));
+        assert_eq!(
+            program(
+                b"band\n\
                      bor\n\
                      and\n\
-                     xor"), // Works without terminating newline.
-            Ok(vec![
-                IrNode::Band,
-                IrNode::Bor,
-                IrNode::And,
-                IrNode::Xor,
-            ])
+                     xor"
+            ), // Works without terminating newline.
+            Ok(vec![IrNode::Band, IrNode::Bor, IrNode::And, IrNode::Xor,])
         );
         assert_eq!(
-            program(b"band\n\
+            program(
+                b"band\n\
                      BOR\n\
                      And\n\
-                     xOR\n"), // Also works with terminating newline.
-            Ok(vec![
-                IrNode::Band,
-                IrNode::Bor,
-                IrNode::And,
-                IrNode::Xor,
-            ])
+                     xOR\n"
+            ), // Also works with terminating newline.
+            Ok(vec![IrNode::Band, IrNode::Bor, IrNode::And, IrNode::Xor,])
         );
 
         // Other whitespace:
@@ -206,6 +231,17 @@ mod tests {
             ), // Also works with terminating newline.
             Ok(vec![IrNode::Band, IrNode::Bor, IrNode::And, IrNode::Xor,])
         );
+    }
+
+    #[test]
+    fn slightly_more_complex_program() {
+        assert_eq!(
+            program(
+                b"Iconst 500\n\
+                  Iconst 0"
+            ),
+            Ok(vec![IrNode::Iconst(500), IrNode::Iconst(0),])
+        )
     }
 }
 
