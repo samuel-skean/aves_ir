@@ -6,7 +6,7 @@ use nom::{
     },
     combinator::{all_consuming, value},
     multi::separated_list0,
-    sequence::{delimited, terminated},
+    sequence::{delimited, preceded, tuple},
     IResult,
 };
 
@@ -19,9 +19,9 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 }
 
 fn iconst(input: &str) -> NodeResult {
-    let (rest, _) = terminated(tag_no_case("ICONST"), space1)(input)?;
-    let (rest, num) = nom_i64(rest)?;
-    Ok((rest, IrNode::Iconst(num)))
+    let (rest, i) = 
+        preceded(tuple((tag_no_case("ICONST"), space1)), nom_i64)(input)?;
+    Ok((rest, IrNode::Iconst(i)))
 }
 
 fn string_literal(input: &str) -> IResult<&str, String> {
@@ -38,10 +38,7 @@ fn string_literal(input: &str) -> IResult<&str, String> {
 }
 
 fn sconst(input: &str) -> NodeResult {
-    let (rest, _) = terminated(tag_no_case("SCONST"), space1)(input)?;
-
-    let (rest, transformed_text) = string_literal(rest)?;
-
+    let (rest, transformed_text) = preceded(tuple((tag_no_case("SCONST"), space1)), string_literal)(input)?;
     Ok((rest, IrNode::Sconst(transformed_text.into())))
 }
 
@@ -124,9 +121,7 @@ fn not(input: &str) -> NodeResult {
 }
 
 fn jump(input: &str) -> NodeResult {
-    let (rest, _) = terminated(tag_no_case("JUMP"), space1)(input)?;
-    let (rest, label_text) = identifier(rest)?;
-
+    let (rest, label_text) = preceded(tuple((tag_no_case("JUMP"), space1)), identifier)(input)?;
     Ok((rest, IrNode::Jump(Label(label_text.into()))))
 }
 
@@ -237,9 +232,9 @@ mod tests {
         assert_eq!(
             program(
                 "band\n\
-                     bor\n\
-                     and\n\
-                     xor"
+                bor\n\
+                and\n\
+                xor"
             ), // Works without terminating newline.
             Ok(vec![IrNode::Band, IrNode::Bor, IrNode::And, IrNode::Xor,])
         );
