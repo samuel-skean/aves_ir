@@ -166,19 +166,28 @@ fn arg_local_write(input: &str) -> NodeResult {
     Ok((rest, IrNode::ArgLocalWrite(index)))
 }
 
+fn label(input: &str) -> NodeResult {
+    let (rest, name) = preceded(tuple((tag_no_case("LABEL"), space1)), identifier)(input)?;
+    Ok((rest, IrNode::Label(Label::named(name))))
+}
+
 fn jump(input: &str) -> NodeResult {
-    let (rest, label_text) = preceded(tuple((tag_no_case("JUMP"), space1)), identifier)(input)?;
-    Ok((rest, IrNode::Jump(Label::named(label_text))))
+    let (rest, name) = preceded(tuple((tag_no_case("JUMP"), space1)), identifier)(input)?;
+    Ok((rest, IrNode::Jump(Label::named(name))))
+}
+
+fn branch_zero(input: &str) -> NodeResult {
+    let (rest, name) = preceded(tuple((tag_no_case("BRANCHZERO"), space1)), identifier)(input)?;
+    Ok((rest, IrNode::BranchZero(Label::named(name))))
 }
 
 pub fn node(input: &str) -> NodeResult {
     alt((
         alt((
-            iconst, sconst, nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt,
-            not,
+            iconst, sconst, nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt, not,
         )),
         alt((reserve, read, write, arg_local_read, arg_local_write)),
-        alt((jump,))
+        alt((label, jump, branch_zero)),
     ))(input)
 }
 
@@ -197,18 +206,6 @@ pub fn program(input: &str) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&s
 mod tests {
     // TODO: Make an assert macro that prints out byte slices as bytes when it fails.
     use super::*;
-
-    #[test]
-    fn jump() {
-        assert_eq!(
-            node("JUMP L0  h"),
-            Ok(("  h", IrNode::Jump(Label::named("L0"))))
-        );
-        assert_eq!(
-            node("JUMP alskdhjfa"),
-            Ok(("", IrNode::Jump(Label::named("alskdhjfa"))))
-        );
-    }
 
     #[test]
     fn noarg_nodes() {
@@ -350,6 +347,40 @@ mod tests {
 
         // Instructions on locals do not take names:
         assert!(node("ARGLOCAL_READ illegal_named_local").is_err());
+    }
+
+    #[test]
+    fn control_flow() {
+        // Label:
+        assert_eq!(
+            node("Label birch"),
+            Ok(("", IrNode::Label(Label::named("birch"))))
+        );
+
+        assert_eq!(
+            node("Label Sam"),
+            Ok(("", IrNode::Label(Label::named("Sam"))))
+        );
+
+        // Jump:
+        assert_eq!(
+            node("JUMP L0  h"),
+            Ok(("  h", IrNode::Jump(Label::named("L0"))))
+        );
+        assert_eq!(
+            node("JUMP alskdhjfa"),
+            Ok(("", IrNode::Jump(Label::named("alskdhjfa"))))
+        );
+
+        // BranchZero:
+        assert_eq!(
+            node("branchzero l20"),
+            Ok(("", IrNode::BranchZero(Label::named("l20"))))
+        );
+        assert_eq!(
+            node("branchZERO foo\n"),
+            Ok(("\n", IrNode::BranchZero(Label::named("foo"))))
+        );
     }
 
     #[test]
