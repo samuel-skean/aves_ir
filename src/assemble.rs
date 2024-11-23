@@ -146,6 +146,26 @@ fn reserve(input: &str) -> NodeResult {
     }
 }
 
+fn read(input: &str) -> NodeResult {
+    let (rest, name) = preceded(tuple((tag_no_case("READ"), space1)), identifier)(input)?;
+    Ok((rest, IrNode::Read(name.into())))
+}
+
+fn write(input: &str) -> NodeResult {
+    let (rest, name) = preceded(tuple((tag_no_case("WRITE"), space1)), identifier)(input)?;
+    Ok((rest, IrNode::Write(name.into())))
+}
+
+fn arg_local_read(input: &str) -> NodeResult {
+    let (rest, index) = preceded(tuple((tag_no_case("ARGLOCAL_READ"), space1)), nom_u64)(input)?;
+    Ok((rest, IrNode::ArgLocalRead(index)))
+}
+
+fn arg_local_write(input: &str) -> NodeResult {
+    let (rest, index) = preceded(tuple((tag_no_case("ARGLOCAL_WRITE"), space1)), nom_u64)(input)?;
+    Ok((rest, IrNode::ArgLocalWrite(index)))
+}
+
 fn jump(input: &str) -> NodeResult {
     let (rest, label_text) = preceded(tuple((tag_no_case("JUMP"), space1)), identifier)(input)?;
     Ok((rest, IrNode::Jump(Label(label_text.into()))))
@@ -153,8 +173,12 @@ fn jump(input: &str) -> NodeResult {
 
 pub fn node(input: &str) -> NodeResult {
     alt((
-        iconst, sconst, nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt, not,
-        jump, reserve
+        alt((
+            iconst, sconst, nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt,
+            not,
+        )),
+        alt((reserve, read, write, arg_local_read, arg_local_write)),
+        alt((jump,))
     ))(input)
 }
 
@@ -281,16 +305,51 @@ mod tests {
         );
 
         // Reserving integers:
-
         assert_eq!(
             node("Reserve $$FREAKY_INTERNAL_COMPILER_GLOBAL$$ 4 (null)\t\n"),
-            Ok(("\t\n", IrNode::ReserveInt { name: "$$FREAKY_INTERNAL_COMPILER_GLOBAL$$".into() }))
+            Ok((
+                "\t\n",
+                IrNode::ReserveInt {
+                    name: "$$FREAKY_INTERNAL_COMPILER_GLOBAL$$".into()
+                }
+            ))
         );
 
         assert_eq!(
             node("RESERVE $_$ 4 (null)"),
             Ok(("", IrNode::ReserveInt { name: "$_$".into() }))
         )
+    }
+
+    #[test]
+    fn variables() {
+        // Globals:
+        assert_eq!(node("WRITE $$$"), Ok(("", IrNode::Write("$$$".into()))));
+
+        assert_eq!(node("READ _lkas"), Ok(("", IrNode::Read("_lkas".into()))));
+
+        assert_eq!(
+            node("read kddk\n \t"),
+            Ok(("\n \t", IrNode::Read("kddk".into())))
+        );
+
+        // Locals:
+        assert_eq!(
+            node("ARGLOCAL_READ 200"),
+            Ok(("", IrNode::ArgLocalRead(200)))
+        );
+
+        assert_eq!(
+            node("ARGLOCAL_WRITE  \t 40"),
+            Ok(("", IrNode::ArgLocalWrite(40)))
+        );
+
+        // Negative locals are not allowed:
+        assert!(node("ARGLOCAL_READ -1").is_err());
+        assert!(node("ARGLOCAL_WRITE -2340").is_err());
+
+        // Instructions on locals do not take names:
+        assert!(node("ARGLOCAL_READ illegal_named_local").is_err());
     }
 
     #[test]
