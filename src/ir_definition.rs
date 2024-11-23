@@ -70,9 +70,9 @@ pub enum IrNode {
 
     // TODO: These have registers specified as immediates. What's up with that?
     Push {
-        reg: u64,
+        reg: i64,
     }, // I don't think Bluejay would ever generate these.
     Pop {
-        reg: u64,
+        reg: i64,
     },
 }

@@ -227,6 +227,16 @@ fn intrinsic(input: &str) -> NodeResult {
     Ok((rest, IrNode::Intrinsic(intrinsic)))
 }
 
+fn push(input: &str) -> NodeResult {
+    let (rest, reg) = preceded(tuple((tag_no_case("PUSH"), space1)), nom_i64)(input)?;
+    Ok((rest, IrNode::Push { reg }))
+}
+
+fn pop(input: &str) -> NodeResult {
+    let (rest, reg) = preceded(tuple((tag_no_case("POP"), space1)), nom_i64)(input)?;
+    Ok((rest, IrNode::Pop { reg }))
+}
+
 pub fn node(input: &str) -> NodeResult {
     alt((
         alt((
@@ -235,6 +245,7 @@ pub fn node(input: &str) -> NodeResult {
         alt((reserve, read, write, arg_local_read, arg_local_write)),
         alt((label, jump, branch_zero)),
         alt((function, call, ret, intrinsic)),
+        alt((push, pop)),
     ))(input)
 }
 
@@ -500,6 +511,21 @@ mod tests {
         assert!(node("intrinsic not_an_intrinsic").is_err());
 
         assert!(node("intrinsic").is_err()); // Intrinsic not specified.
+    }
+
+    #[test]
+    fn push_pop() {
+        // Push:
+        assert_eq!(node("Push 1"), Ok(("", IrNode::Push { reg: 1 })));
+        assert_eq!(node("PUSH 2020"), Ok(("", IrNode::Push { reg: 2020 })));
+        
+        assert!(node("PUSH").is_err()); // Bare push not allowed
+
+        // Pop:
+        assert_eq!(node("pop -1"), Ok(("", IrNode::Pop { reg: -1 })));
+        assert_eq!(node("poP 2013 "), Ok((" ", IrNode::Pop { reg: 2013 })));
+
+        assert!(node("POP").is_err()); // Bare pop also not allowed...
     }
 
     #[test]
