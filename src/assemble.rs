@@ -6,7 +6,7 @@ use nom::{
     },
     combinator::{all_consuming, value},
     multi::separated_list0,
-    sequence::{delimited, preceded, tuple},
+    sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
 
@@ -167,7 +167,7 @@ fn arg_local_write(input: &str) -> NodeResult {
 }
 
 fn label(input: &str) -> NodeResult {
-    let (rest, name) = preceded(tuple((tag_no_case("LABEL"), space1)), identifier)(input)?;
+    let (rest, name) = terminated(identifier, tag_no_case(":"))(input)?;
     Ok((rest, IrNode::Label(Label::named(name))))
 }
 
@@ -400,12 +400,12 @@ mod tests {
     fn control_flow() {
         // Label:
         assert_eq!(
-            node("Label birch"),
+            node("birch:"),
             Ok(("", IrNode::Label(Label::named("birch"))))
         );
 
         assert_eq!(
-            node("Label Sam"),
+            node("Sam:"),
             Ok(("", IrNode::Label(Label::named("Sam"))))
         );
 
