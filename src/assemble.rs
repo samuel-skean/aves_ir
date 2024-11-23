@@ -415,10 +415,7 @@ mod tests {
             Ok(("", IrNode::Label(Label::named("birch"))))
         );
 
-        assert_eq!(
-            node("Sam:"),
-            Ok(("", IrNode::Label(Label::named("Sam"))))
-        );
+        assert_eq!(node("Sam:"), Ok(("", IrNode::Label(Label::named("Sam")))));
 
         // Jump:
         assert_eq!(
@@ -504,9 +501,18 @@ mod tests {
 
         // Intrinsic:
 
-        assert_eq!(node("Intrinsic PRINT_STRING"), Ok(("", IrNode::Intrinsic(Intrinsic::PrintString))));
-        assert_eq!(node("INTRINSIC print_int"), Ok(("", IrNode::Intrinsic(Intrinsic::PrintInt))));
-        assert_eq!(node("Intrinsic exit"), Ok(("", IrNode::Intrinsic(Intrinsic::Exit))));
+        assert_eq!(
+            node("Intrinsic PRINT_STRING"),
+            Ok(("", IrNode::Intrinsic(Intrinsic::PrintString)))
+        );
+        assert_eq!(
+            node("INTRINSIC print_int"),
+            Ok(("", IrNode::Intrinsic(Intrinsic::PrintInt)))
+        );
+        assert_eq!(
+            node("Intrinsic exit"),
+            Ok(("", IrNode::Intrinsic(Intrinsic::Exit)))
+        );
 
         assert!(node("intrinsic not_an_intrinsic").is_err());
 
@@ -518,7 +524,7 @@ mod tests {
         // Push:
         assert_eq!(node("Push 1"), Ok(("", IrNode::Push { reg: 1 })));
         assert_eq!(node("PUSH 2020"), Ok(("", IrNode::Push { reg: 2020 })));
-        
+
         assert!(node("PUSH").is_err()); // Bare push not allowed
 
         // Pop:
