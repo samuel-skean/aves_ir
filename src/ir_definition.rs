@@ -8,7 +8,7 @@ impl Label {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Intrinsic {
     PrintInt,
     PrintString,
@@ -63,7 +63,7 @@ pub enum IrNode {
     },
     Call {
         label: Label,
-        num_vars: u64,
+        num_args: u64,
     },
     Ret,
     Intrinsic(Intrinsic),

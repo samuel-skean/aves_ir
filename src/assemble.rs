@@ -10,7 +10,7 @@ use nom::{
     IResult,
 };
 
-use crate::ir_definition::{IrNode, Label};
+use crate::ir_definition::{Intrinsic, IrNode, Label};
 type NodeResult<'a> = IResult<&'a str, IrNode>;
 
 fn identifier(input: &str) -> IResult<&str, &str> {
@@ -42,7 +42,7 @@ fn sconst(input: &str) -> NodeResult {
     Ok((rest, IrNode::Sconst(transformed_text.into())))
 }
 
-// No-arg nodes:
+// All the no-arg nodes (except ret and jump):
 // TODO: These should be done through a macro, but I don't know how to macro right now.
 // Could also be a function that returns a function, but when I tried to write that it had to copy the IrNode.
 fn nop(input: &str) -> NodeResult {
@@ -181,6 +181,52 @@ fn branch_zero(input: &str) -> NodeResult {
     Ok((rest, IrNode::BranchZero(Label::named(name))))
 }
 
+fn function(input: &str) -> NodeResult {
+    let (rest, (name, num_locs)) = preceded(
+        tuple((tag_no_case("FUNCTION"), space1)),
+        tuple((identifier, preceded(space1, nom_u64))),
+    )(input)?;
+    Ok((
+        rest,
+        IrNode::Function {
+            label: Label::named(name),
+            num_locs,
+        },
+    ))
+}
+
+fn call(input: &str) -> NodeResult {
+    let (rest, (name, num_args)) = preceded(
+        tuple((tag_no_case("CALL"), space1)),
+        tuple((identifier, preceded(space1, nom_u64))),
+    )(input)?;
+    Ok((
+        rest,
+        IrNode::Call {
+            label: Label::named(name),
+            num_args,
+        },
+    ))
+}
+
+fn ret(input: &str) -> NodeResult {
+    let (rest, _) = tag_no_case("RET")(input)?;
+    Ok((rest, IrNode::Ret))
+}
+
+fn intrinsic(input: &str) -> NodeResult {
+    let (rest, intrinsic) = preceded(
+        tuple((tag_no_case("INTRINSIC"), space1)),
+        alt((
+            value(Intrinsic::PrintInt, tag_no_case("PRINT_INT")),
+            value(Intrinsic::PrintString, tag_no_case("PRINT_STRING")),
+            value(Intrinsic::Exit, tag_no_case("EXIT")),
+        )),
+    )(input)?;
+
+    Ok((rest, IrNode::Intrinsic(intrinsic)))
+}
+
 pub fn node(input: &str) -> NodeResult {
     alt((
         alt((
@@ -188,6 +234,7 @@ pub fn node(input: &str) -> NodeResult {
         )),
         alt((reserve, read, write, arg_local_read, arg_local_write)),
         alt((label, jump, branch_zero)),
+        alt((function, call, ret, intrinsic)),
     ))(input)
 }
 
@@ -381,6 +428,78 @@ mod tests {
             node("branchZERO foo\n"),
             Ok(("\n", IrNode::BranchZero(Label::named("foo"))))
         );
+    }
+
+    #[test]
+    fn functions() {
+        // Function:
+
+        assert_eq!(
+            node("FuncTion no_locals 0"),
+            Ok((
+                "",
+                IrNode::Function {
+                    label: Label::named("no_locals"),
+                    num_locs: 0
+                }
+            ))
+        );
+
+        assert_eq!(
+            node("FUNCTION some_locals 3"),
+            Ok((
+                "",
+                IrNode::Function {
+                    label: Label::named("some_locals"),
+                    num_locs: 3
+                }
+            ))
+        );
+
+        assert!(node("function negative_locs -5050").is_err());
+        assert!(node("function locs_not_specified ").is_err());
+
+        // Call:
+
+        assert_eq!(
+            node("CALL no_args 0\t\tbruh"),
+            Ok((
+                "\t\tbruh",
+                IrNode::Call {
+                    label: Label::named("no_args"),
+                    num_args: 0
+                }
+            ))
+        );
+
+        assert_eq!(
+            node("CALL many_args 6"),
+            Ok((
+                "",
+                IrNode::Call {
+                    label: Label::named("many_args"),
+                    num_args: 6
+                }
+            ))
+        );
+
+        assert!(node("caLL negative_args -5").is_err());
+        assert!(node("CALL args_not_specified\t").is_err());
+
+        // Ret:
+
+        assert_eq!(node("ret"), Ok(("", IrNode::Ret)));
+        assert_eq!(node("return"), Ok(("urn", IrNode::Ret))); // Tough luck. Keep your english words away from me!
+
+        // Intrinsic:
+
+        assert_eq!(node("Intrinsic PRINT_STRING"), Ok(("", IrNode::Intrinsic(Intrinsic::PrintString))));
+        assert_eq!(node("INTRINSIC print_int"), Ok(("", IrNode::Intrinsic(Intrinsic::PrintInt))));
+        assert_eq!(node("Intrinsic exit"), Ok(("", IrNode::Intrinsic(Intrinsic::Exit))));
+
+        assert!(node("intrinsic not_an_intrinsic").is_err());
+
+        assert!(node("intrinsic").is_err()); // Intrinsic not specified.
     }
 
     #[test]
