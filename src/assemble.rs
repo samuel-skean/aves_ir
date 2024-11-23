@@ -168,7 +168,7 @@ fn arg_local_write(input: &str) -> NodeResult {
 
 fn jump(input: &str) -> NodeResult {
     let (rest, label_text) = preceded(tuple((tag_no_case("JUMP"), space1)), identifier)(input)?;
-    Ok((rest, IrNode::Jump(Label(label_text.into()))))
+    Ok((rest, IrNode::Jump(Label::named(label_text))))
 }
 
 pub fn node(input: &str) -> NodeResult {
@@ -202,11 +202,11 @@ mod tests {
     fn jump() {
         assert_eq!(
             node("JUMP L0  h"),
-            Ok(("  h", IrNode::Jump(Label("L0".into()))))
+            Ok(("  h", IrNode::Jump(Label::named("L0"))))
         );
         assert_eq!(
             node("JUMP alskdhjfa"),
-            Ok(("", IrNode::Jump(Label("alskdhjfa".into()))))
+            Ok(("", IrNode::Jump(Label::named("alskdhjfa"))))
         );
     }
 

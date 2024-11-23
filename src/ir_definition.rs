@@ -1,6 +1,12 @@
 // TODO: Make all String's &str. Requires lifetime shenanigans.
 #[derive(Debug, PartialEq)]
-pub struct Label(pub String);
+pub struct Label(String);
+
+impl Label {
+    pub fn named(name: &str) -> Self {
+        Label(String::from(name))
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Intrinsic {
