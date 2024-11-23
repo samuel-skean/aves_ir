@@ -37,7 +37,9 @@ pub enum IrNode {
         name: String,
         initial_value: String,
     },
-    ReserveInt(String),
+    ReserveInt {
+        name: String,
+    },
     Read(String),
     Write(String),
     ArgLocalRead(u64),

@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, tag_no_case, take_while},
     character::complete::{
-        char as nom_char, i64 as nom_i64, multispace0, multispace1, none_of, space1,
+        char as nom_char, i64 as nom_i64, multispace0, multispace1, none_of, space1, u64 as nom_u64,
     },
     combinator::{all_consuming, value},
     multi::separated_list0,
@@ -19,8 +19,7 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 }
 
 fn iconst(input: &str) -> NodeResult {
-    let (rest, i) = 
-        preceded(tuple((tag_no_case("ICONST"), space1)), nom_i64)(input)?;
+    let (rest, i) = preceded(tuple((tag_no_case("ICONST"), space1)), nom_i64)(input)?;
     Ok((rest, IrNode::Iconst(i)))
 }
 
@@ -38,7 +37,8 @@ fn string_literal(input: &str) -> IResult<&str, String> {
 }
 
 fn sconst(input: &str) -> NodeResult {
-    let (rest, transformed_text) = preceded(tuple((tag_no_case("SCONST"), space1)), string_literal)(input)?;
+    let (rest, transformed_text) =
+        preceded(tuple((tag_no_case("SCONST"), space1)), string_literal)(input)?;
     Ok((rest, IrNode::Sconst(transformed_text.into())))
 }
 
@@ -120,6 +120,32 @@ fn not(input: &str) -> NodeResult {
     Ok((rest, IrNode::Not))
 }
 
+fn reserve(input: &str) -> NodeResult {
+    let (start_of_string_or_null, (name, size)) = preceded(
+        tag_no_case("RESERVE"),
+        tuple((
+            preceded(space1, identifier),
+            // Is there every a good reason to reserve a negative amount of space?
+            delimited(space1, nom_u64, space1),
+        )),
+    )(input)?;
+
+    if start_of_string_or_null.as_bytes()[0] == b'\"' {
+        let (rest, initial_value) = string_literal(start_of_string_or_null)?;
+        return Ok((
+            rest,
+            IrNode::ReserveString {
+                size,
+                name: name.into(),
+                initial_value,
+            },
+        ));
+    } else {
+        let (rest, _) = tag_no_case("(null)")(start_of_string_or_null)?;
+        return Ok((rest, IrNode::ReserveInt { name: name.into() }));
+    }
+}
+
 fn jump(input: &str) -> NodeResult {
     let (rest, label_text) = preceded(tuple((tag_no_case("JUMP"), space1)), identifier)(input)?;
     Ok((rest, IrNode::Jump(Label(label_text.into()))))
@@ -128,7 +154,7 @@ fn jump(input: &str) -> NodeResult {
 pub fn node(input: &str) -> NodeResult {
     alt((
         iconst, sconst, nop, add, sub, mul, div, mod_, bor, band, xor, or, and, eq, lt, gt, not,
-        jump,
+        jump, reserve
     ))(input)
 }
 
@@ -224,6 +250,47 @@ mod tests {
                 IrNode::Sconst(" \t with tabs and literal \\ backslashes".into())
             ))
         );
+    }
+
+    #[test]
+    fn reserve() {
+        // STRETCH: Should I let the user know when they're reserving the wrong amount of space for strings?
+        // Reserving strings:
+        assert_eq!(
+            node("Reserve var 10 \"Hello world\""),
+            Ok((
+                "",
+                IrNode::ReserveString {
+                    size: 10,
+                    name: "var".into(),
+                    initial_value: "Hello world".into()
+                }
+            ))
+        );
+
+        assert_eq!(
+            node("Reserve 1bruh1 20 \"I \\\\ have a bunch \n \\\" of weird stuff\"  "),
+            Ok((
+                "  ",
+                IrNode::ReserveString {
+                    size: 20,
+                    name: "1bruh1".into(),
+                    initial_value: "I \\ have a bunch \n \" of weird stuff".into()
+                }
+            ))
+        );
+
+        // Reserving integers:
+
+        assert_eq!(
+            node("Reserve $$FREAKY_INTERNAL_COMPILER_GLOBAL$$ 4 (null)\t\n"),
+            Ok(("\t\n", IrNode::ReserveInt { name: "$$FREAKY_INTERNAL_COMPILER_GLOBAL$$".into() }))
+        );
+
+        assert_eq!(
+            node("RESERVE $_$ 4 (null)"),
+            Ok(("", IrNode::ReserveInt { name: "$_$".into() }))
+        )
     }
 
     #[test]
