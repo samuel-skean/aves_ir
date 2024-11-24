@@ -18,11 +18,6 @@ fn identifier(input: &str) -> IResult<&str, &str> {
     take_while(|c| char::is_alphanumeric(c) || c == '$' || c == '_')(input)
 }
 
-fn iconst(input: &str) -> NodeResult {
-    let (rest, i) = preceded(tuple((tag_no_case("ICONST"), space1)), nom_i64)(input)?;
-    Ok((rest, IrNode::Iconst(i)))
-}
-
 fn string_literal(input: &str) -> IResult<&str, String> {
     use nom::bytes::complete::tag;
     delimited(
@@ -36,89 +31,41 @@ fn string_literal(input: &str) -> IResult<&str, String> {
     )(input)
 }
 
+macro_rules! noarg_node {
+    ($func_name:ident, $tag_text:literal, $result:expr) => {
+        fn $func_name(input: &str) -> NodeResult {
+            let (rest, _) = tag_no_case($tag_text)(input)?;
+            Ok((rest, $result))
+        }
+    };
+}
+
+fn iconst(input: &str) -> NodeResult {
+    let (rest, i) = preceded(tuple((tag_no_case("ICONST"), space1)), nom_i64)(input)?;
+    Ok((rest, IrNode::Iconst(i)))
+}
+
 fn sconst(input: &str) -> NodeResult {
     let (rest, transformed_text) =
         preceded(tuple((tag_no_case("SCONST"), space1)), string_literal)(input)?;
     Ok((rest, IrNode::Sconst(transformed_text.into())))
 }
 
-// All the no-arg nodes (except ret and jump):
-// TODO: These should be done through a macro, but I don't know how to macro right now.
-// Could also be a function that returns a function, but when I tried to write that it had to copy the IrNode.
-fn nop(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("NOP")(input)?;
-    Ok((rest, IrNode::Nop))
-}
-
-fn add(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("ADD")(input)?;
-    Ok((rest, IrNode::Add))
-}
-
-fn sub(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("SUB")(input)?;
-    Ok((rest, IrNode::Sub))
-}
-
-fn mul(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("MUL")(input)?;
-    Ok((rest, IrNode::Mul))
-}
-
-fn div(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("DIV")(input)?;
-    Ok((rest, IrNode::Div))
-}
-
-fn mod_(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("MOD")(input)?;
-    Ok((rest, IrNode::Mod))
-}
-
-fn bor(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("BOR")(input)?;
-    Ok((rest, IrNode::Bor))
-}
-
-fn band(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("BAND")(input)?;
-    Ok((rest, IrNode::Band))
-}
-
-fn xor(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("XOR")(input)?;
-    Ok((rest, IrNode::Xor))
-}
-
-fn or(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("OR")(input)?;
-    Ok((rest, IrNode::Or))
-}
-
-fn and(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("AND")(input)?;
-    Ok((rest, IrNode::And))
-}
-
-fn eq(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("EQ")(input)?;
-    Ok((rest, IrNode::Eq))
-}
-
-fn lt(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("LT")(input)?;
-    Ok((rest, IrNode::Lt))
-}
-
-fn gt(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("GT")(input)?;
-    Ok((rest, IrNode::Gt))
-}
-
-fn not(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("NOT")(input)?;
-    Ok((rest, IrNode::Not))
-}
+noarg_node!(nop, "NOP", IrNode::Nop);
+noarg_node!(add, "ADD", IrNode::Add);
+noarg_node!(sub, "SUB", IrNode::Sub);
+noarg_node!(mul, "MUL", IrNode::Mul);
+noarg_node!(div, "DIV", IrNode::Div);
+noarg_node!(mod_, "MOD", IrNode::Mod);
+noarg_node!(bor, "BOR", IrNode::Bor);
+noarg_node!(band, "BAND", IrNode::Band);
+noarg_node!(xor, "XOR", IrNode::Xor);
+noarg_node!(or, "OR", IrNode::Or);
+noarg_node!(and, "AND", IrNode::And);
+noarg_node!(eq, "EQ", IrNode::Eq);
+noarg_node!(lt, "LT", IrNode::Lt);
+noarg_node!(gt, "GT", IrNode::Gt);
+noarg_node!(not, "NOT", IrNode::Not);
 
 fn reserve(input: &str) -> NodeResult {
     let (start_of_string_or_null, (name, size)) = preceded(
@@ -209,10 +156,7 @@ fn call(input: &str) -> NodeResult {
     ))
 }
 
-fn ret(input: &str) -> NodeResult {
-    let (rest, _) = tag_no_case("RET")(input)?;
-    Ok((rest, IrNode::Ret))
-}
+noarg_node!(ret, "RET", IrNode::Ret);
 
 fn intrinsic(input: &str) -> NodeResult {
     let (rest, intrinsic) = preceded(
