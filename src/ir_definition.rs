@@ -6,6 +6,10 @@ impl Label {
     pub fn named(name: &str) -> Self {
         Label(String::from(name))
     }
+
+    pub fn name(&self) -> &str {
+        &self.0
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
