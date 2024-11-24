@@ -2,3 +2,7 @@
 
 # macOS:
 .DS_Store
+
+# IR (should be regenerated when testing):
+*.aves_bytecode
+*.aves_text
