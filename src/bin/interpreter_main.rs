@@ -43,8 +43,8 @@ fn main() -> io::Result<()> {
     }
     
     if let Some(output_bytecode_path) = options.output_bytecode_path {
-        let output_bytecode = BufWriter::new(File::create(output_bytecode_path)?);
-        dump_bytecode(prog.unwrap().as_ref(), output_bytecode)?;
+        let mut output_bytecode_file = BufWriter::new(File::create(output_bytecode_path)?);
+        dump_bytecode(prog.unwrap().as_ref(), &mut output_bytecode_file)?;
     }
 
     return Ok(());

@@ -3,88 +3,71 @@ use std::io;
 
 use crate::ir_definition::{Intrinsic, Label, IrNode};
 
-trait ToBytecode {
-    type Output: AsRef<[u8]>;
-    fn to_bytecode(&self) -> Self::Output;
+
+pub fn dump_bytecode(ir_list: &[IrNode], out: &mut impl io::Write) -> io::Result<()> {
+    for node in ir_list {
+        node.write_bytecode(out)?;
+    }
+    Ok(())
 }
 
-impl ToBytecode for i32 {
-    // TODO: Make this not require an allocation.
-    type Output = Vec<u8>;
+trait WriteBytecode {
+    fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()>;
+}
 
-    fn to_bytecode(&self) -> Self::Output {
-        self.to_le_bytes().into()
+impl WriteBytecode for i32 {
+    fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()> {
+        out.write_all(&self.to_le_bytes())
     }
 }
 
-impl ToBytecode for u32 {
-    // TODO: make this not require an allocation.
-
-    type Output = Vec<u8>;
-
-    fn to_bytecode(&self) -> Self::Output {
-        self.to_le_bytes().into()
+impl WriteBytecode for u32 {
+    fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()> {
+        out.write_all(&self.to_le_bytes())
     }
 }
 
-impl ToBytecode for i64 {
-    // TODO: make this not require an allocation.
-    type Output = Vec<u8>;
-
-    fn to_bytecode(&self) -> Self::Output {
+impl WriteBytecode for i64 {
+    fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()> {
         // Should we really be limiting ourselves to only 32 bits for integer constants in the IR?
         // I guess if we're mostly targeting MIPS-32, that makes sense.
-        (*self as i32).to_le_bytes().into()
+        (*self as u32).write_bytecode(out)
     }
 }
 
 // TODO: This is a little ugly because it's *so close* to a name collision with the C stuff.
-impl ToBytecode for Label {
-    type Output = Vec<u8>;
-    fn to_bytecode(&self) -> Self::Output {
+impl WriteBytecode for Label {
+
+    fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()> {
         let raw_bytes = self.name().as_bytes();
 
         // TODO: But why is it signed? Is it safe to make it unsigned?
         let length_including_null_terminator = (raw_bytes.len() + 1) as i32;
-        let mut bytecode = Vec::from(length_including_null_terminator.to_bytecode());
-        bytecode.extend_from_slice(raw_bytes);
-        bytecode.push(0u8);
-        bytecode
+        length_including_null_terminator.write_bytecode(out)?;
+        out.write_all(raw_bytes)?;
+        out.write_all(&[0u8])
     }
 }
 
-impl ToBytecode for Intrinsic {
-    // TODO: Make this not require an allocation.
-    type Output = Vec<u8>;
-    fn to_bytecode(&self) -> Self::Output {
-        // STRETCH: *sigh*. Needed to do this because I couldn't borrow the
-        // result of to_le_bytes and return it from this function.
-        // STRETCH: Somehow make this use to_bytecode on the ints as well.
-        // Should be easier if I could make to_bytecode not return a Vec for the
-        // ints.
-        const INTRINSIC_BYTES: [&[u8; 4]; 3] = {
-            let mut intrinsic_bytes = [&[0u8; 4]; 3];
-            intrinsic_bytes[intrinsic_intrinsic_print_int as usize] = &intrinsic_intrinsic_print_int.to_le_bytes();
-            intrinsic_bytes[intrinsic_intrinsic_print_string as usize] = &intrinsic_intrinsic_print_string.to_le_bytes();
-            intrinsic_bytes[intrinsic_intrinsic_exit as usize] = &intrinsic_intrinsic_exit.to_le_bytes();
-            intrinsic_bytes
-        };
-        INTRINSIC_BYTES[match self {
+impl WriteBytecode for Intrinsic {
+
+    fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()> {
+        let val_to_write = match self {
             Intrinsic::PrintInt => intrinsic_intrinsic_print_int,
             Intrinsic::PrintString => intrinsic_intrinsic_print_string,
             Intrinsic::Exit => intrinsic_intrinsic_exit,
-        } as usize].into()
+        };
+        val_to_write.write_bytecode(out)
     }
 }
-// TODO: Consider making the actual conversion into bytecode by implementing ToBytecode on IrNode.
 
-pub fn dump_bytecode(ir_list: &[IrNode], mut out: impl io::Write) -> io::Result<()> {
-    for node in ir_list {
-        match node {
-            IrNode::Nop => { out.write_all(&ir_op_ir_nop.to_bytecode())?; }
+impl WriteBytecode for IrNode {
+    fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()> {
+        match self {
+            IrNode::Nop => ir_op_ir_nop.write_bytecode(out),
             IrNode::Iconst(num) => { 
-                out.write_all(&ir_op_ir_iconst.to_bytecode())?;
-                out.write_all(&num.to_bytecode())?;
+                ir_op_ir_iconst.write_bytecode(out)?;
+                num.write_bytecode(out)
             }
             IrNode::Sconst(_) => todo!(),
             IrNode::Add => todo!(),
@@ -108,24 +91,23 @@ pub fn dump_bytecode(ir_list: &[IrNode], mut out: impl io::Write) -> io::Result<
             IrNode::ArgLocalRead(_) => todo!(),
             IrNode::ArgLocalWrite(_) => todo!(),
             IrNode::Label(label) => {
-                out.write_all(&ir_op_ir_lbl.to_bytecode())?;
-                out.write_all(&label.to_bytecode())?;
+                ir_op_ir_lbl.write_bytecode(out)?;
+                label.write_bytecode(out)
             }
             IrNode::Jump(label) => {
-                out.write_all(&ir_op_ir_jump.to_bytecode())?;
-                out.write_all(&label.to_bytecode())?;
+                ir_op_ir_jump.write_bytecode(out)?;
+                label.write_bytecode(out)
             }
             IrNode::BranchZero(label) => todo!(),
             IrNode::Function { label, num_locs } => todo!(),
             IrNode::Call { label, num_args } => todo!(),
             IrNode::Ret => todo!(),
             IrNode::Intrinsic(intrinsic) => {
-                out.write_all(&ir_op_ir_intrinsic.to_bytecode())?;
-                out.write_all(&intrinsic.to_bytecode())?;
+                ir_op_ir_intrinsic.write_bytecode(out)?;
+                intrinsic.write_bytecode(out)
             }
             IrNode::Push { reg } => todo!(),
             IrNode::Pop { reg } => todo!(),
-        };
+        }
     }
-    Ok(())
 }
