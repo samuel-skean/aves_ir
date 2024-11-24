@@ -1,7 +1,7 @@
 pub mod assemble;
-pub mod ir_definition;
-pub mod dump_bytecode;
 pub mod bindings;
+pub mod dump_bytecode;
+pub mod ir_definition;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
