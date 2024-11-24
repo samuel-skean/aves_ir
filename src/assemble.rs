@@ -194,7 +194,6 @@ pub fn node(input: &str) -> NodeResult {
 }
 
 pub fn program(input: &str) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&str>>> {
-    // TODO: Handle the final missing newline. This somehow doesn't work.
     let (rest, prog) = all_consuming(delimited(
         multispace0,
         separated_list0(multispace1, node),
@@ -206,7 +205,6 @@ pub fn program(input: &str) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&s
 
 #[cfg(test)]
 mod tests {
-    // TODO: Make an assert macro that prints out byte slices as bytes when it fails.
     use super::*;
 
     #[test]
