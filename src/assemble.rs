@@ -208,6 +208,12 @@ mod tests {
     use super::*;
 
     #[test]
+    fn string_lit() {
+        assert_eq!(string_literal("\" \""), Ok(("", " ".into())));
+        assert_eq!(string_literal("\"\""), Ok(("", "".into())));
+    }
+
+    #[test]
     fn noarg_nodes() {
         // I never know how many tests to write...
         // Positive examples:
@@ -251,6 +257,14 @@ mod tests {
             Ok((
                 "",
                 IrNode::Sconst("Hello I'm a string with no escapes".into())
+            ))
+        );
+
+        assert_eq!(
+            node("SCONST \"\""),
+            Ok((
+                "",
+                IrNode::Sconst("".into())
             ))
         );
 

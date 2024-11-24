@@ -2,6 +2,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    // TODO: Make this rebuild the C code as well, on-demand.
     // This code is copied from a tutorial on rust-bindgen, modified minimally for these files.
 
     // This is the directory where the `c` library is located.

@@ -116,7 +116,8 @@ impl WriteBytecode for IrNode {
             IrNode::ReserveInt { name } => {
                 ir_op_ir_reserve.write_bytecode(out)?;
                 name.as_str().write_bytecode(out)?;
-                "".write_bytecode(out)?;
+                // Write the size 0, and nothing else for the string, because the string is conceptually null.
+                0.write_bytecode(out)?;
                 4.write_bytecode(out)
             }
             IrNode::Read(name) => {

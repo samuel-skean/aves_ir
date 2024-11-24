@@ -3,5 +3,7 @@
 # macOS:
 .DS_Store
 
-# IR Text (should be regenerated when testing):
+# Roundtrip testing artifacts:
 *.aves_text
+xxd_bytecode_difference
+text_difference
