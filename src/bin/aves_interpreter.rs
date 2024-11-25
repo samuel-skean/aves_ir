@@ -4,7 +4,7 @@ use std::{
     os::fd::AsRawFd as _,
 };
 
-use aves_ir::{assemble, bindings, dump_bytecode::dump_bytecode};
+use aves_ir::{assemble, bindings, write_bytecode::dump_bytecode};
 use clap::Parser;
 
 #[derive(Parser)]

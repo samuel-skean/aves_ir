@@ -4,6 +4,8 @@
 .DS_Store
 
 # Roundtrip testing artifacts:
-*.aves_text
+out.aves_text
+rust_out.aves_text
+printed.aves_text
 xxd_bytecode_difference
 text_difference
