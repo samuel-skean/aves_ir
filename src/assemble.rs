@@ -1,11 +1,9 @@
 use nom::{
     branch::alt,
-    bytes::complete::{escaped_transform, tag_no_case, take_while1},
-    character::complete::{
-        char as nom_char, i64 as nom_i64, multispace0, multispace1, none_of, space1, u64 as nom_u64,
-    },
-    combinator::{all_consuming, opt, value},
-    multi::separated_list0,
+    bytes::complete::{escaped_transform, tag_no_case, take_while, take_while1},
+    character::complete::{char as nom_char, i64 as nom_i64, none_of, u64 as nom_u64},
+    combinator::{all_consuming, map, opt, value},
+    multi::{many0_count, many1_count, separated_list0},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -17,22 +15,47 @@ fn identifier(input: &str) -> IResult<&str, &str> {
     take_while1(|c| char::is_alphanumeric(c) || c == '$' || c == '_')(input)
 }
 
-fn string_literal(input: &str) -> IResult<&str, String> {
+fn inside_string(input: &str) -> IResult<&str, String> {
     use nom::bytes::complete::tag;
-    // STRETCH: There's gotta be a nicer way to handle potentially empty
-    // strings. escaped_transform seems to happily deal with empty strings, but
-    // it doesn't work within delimited unless I use opt, which makes this much
-    // uglier.
-    let (rest, text) = delimited(
-        nom_char('\"'),
+    // STRETCH: Okay, there's gotta be a better way. Why do I need to use opt
+    // for this to work correctly within string_literal?
+    map(
         opt(escaped_transform(
-            none_of("\\\""),
+            none_of(r#"\""#),
             '\\',
-            alt((value("\\", tag("\\")), value("\"", tag("\"")))),
+            alt((value(r"\", tag(r"\")), value(r#"""#, tag(r#"""#)))),
         )),
-        nom_char('\"'),
-    )(input)?;
-    Ok((rest, text.unwrap_or("".into())))
+        |inner_text| inner_text.unwrap_or("".into()),
+    )(input)
+}
+
+fn string_literal(input: &str) -> IResult<&str, String> {
+    delimited(nom_char('"'), inside_string, nom_char('"'))(input)
+}
+
+fn multi_line_comment(input: &str) -> IResult<&str, &str> {
+    use nom::bytes::complete::{tag, take_until};
+    delimited(tag("/*"), take_until("*/"), tag("*/"))(input)
+}
+
+// Does not consume the thing that ended the single_line_comment (either a newline or the end of the file).
+fn single_line_comment(input: &str) -> IResult<&str, &str> {
+    use nom::bytes::complete::tag;
+    preceded(tag("#"), take_while(|c| c != '\n'))(input)
+}
+
+fn within_node(input: &str) -> IResult<&str, &str> {
+    use nom::{character::complete::space1, combinator::recognize};
+    recognize(many0_count(alt((space1, multi_line_comment))))(input)
+}
+
+fn between_nodes(input: &str) -> IResult<&str, &str> {
+    use nom::{character::complete::multispace1, combinator::recognize};
+    recognize(many1_count(alt((
+        multispace1,
+        multi_line_comment,
+        single_line_comment,
+    ))))(input)
 }
 
 macro_rules! noarg_node {
@@ -45,13 +68,13 @@ macro_rules! noarg_node {
 }
 
 fn iconst(input: &str) -> NodeResult {
-    let (rest, i) = preceded(tuple((tag_no_case("ICONST"), space1)), nom_i64)(input)?;
+    let (rest, i) = preceded(tuple((tag_no_case("ICONST"), within_node)), nom_i64)(input)?;
     Ok((rest, IrNode::Iconst(i)))
 }
 
 fn sconst(input: &str) -> NodeResult {
     let (rest, transformed_text) =
-        preceded(tuple((tag_no_case("SCONST"), space1)), string_literal)(input)?;
+        preceded(tuple((tag_no_case("SCONST"), within_node)), string_literal)(input)?;
     Ok((rest, IrNode::Sconst(transformed_text.into())))
 }
 
@@ -75,9 +98,9 @@ fn reserve(input: &str) -> NodeResult {
     let (start_of_string_or_null, (name, size)) = preceded(
         tag_no_case("RESERVE"),
         tuple((
-            preceded(space1, identifier),
+            preceded(within_node, identifier),
             // Is there every a good reason to reserve a negative amount of space?
-            delimited(space1, nom_u64, space1),
+            delimited(within_node, nom_u64, within_node),
         )),
     )(input)?;
 
@@ -98,22 +121,24 @@ fn reserve(input: &str) -> NodeResult {
 }
 
 fn read(input: &str) -> NodeResult {
-    let (rest, name) = preceded(tuple((tag_no_case("READ"), space1)), identifier)(input)?;
+    let (rest, name) = preceded(tuple((tag_no_case("READ"), within_node)), identifier)(input)?;
     Ok((rest, IrNode::Read(name.into())))
 }
 
 fn write(input: &str) -> NodeResult {
-    let (rest, name) = preceded(tuple((tag_no_case("WRITE"), space1)), identifier)(input)?;
+    let (rest, name) = preceded(tuple((tag_no_case("WRITE"), within_node)), identifier)(input)?;
     Ok((rest, IrNode::Write(name.into())))
 }
 
 fn arg_local_read(input: &str) -> NodeResult {
-    let (rest, index) = preceded(tuple((tag_no_case("ARGLOCAL_READ"), space1)), nom_u64)(input)?;
+    let (rest, index) =
+        preceded(tuple((tag_no_case("ARGLOCAL_READ"), within_node)), nom_u64)(input)?;
     Ok((rest, IrNode::ArgLocalRead(index)))
 }
 
 fn arg_local_write(input: &str) -> NodeResult {
-    let (rest, index) = preceded(tuple((tag_no_case("ARGLOCAL_WRITE"), space1)), nom_u64)(input)?;
+    let (rest, index) =
+        preceded(tuple((tag_no_case("ARGLOCAL_WRITE"), within_node)), nom_u64)(input)?;
     Ok((rest, IrNode::ArgLocalWrite(index)))
 }
 
@@ -123,19 +148,20 @@ fn label(input: &str) -> NodeResult {
 }
 
 fn jump(input: &str) -> NodeResult {
-    let (rest, name) = preceded(tuple((tag_no_case("JUMP"), space1)), identifier)(input)?;
+    let (rest, name) = preceded(tuple((tag_no_case("JUMP"), within_node)), identifier)(input)?;
     Ok((rest, IrNode::Jump(Label::named(name))))
 }
 
 fn branch_zero(input: &str) -> NodeResult {
-    let (rest, name) = preceded(tuple((tag_no_case("BRANCHZERO"), space1)), identifier)(input)?;
+    let (rest, name) =
+        preceded(tuple((tag_no_case("BRANCHZERO"), within_node)), identifier)(input)?;
     Ok((rest, IrNode::BranchZero(Label::named(name))))
 }
 
 fn function(input: &str) -> NodeResult {
     let (rest, (name, num_locs)) = preceded(
-        tuple((tag_no_case("FUNCTION"), space1)),
-        tuple((identifier, preceded(space1, nom_u64))),
+        tuple((tag_no_case("FUNCTION"), within_node)),
+        tuple((identifier, preceded(within_node, nom_u64))),
     )(input)?;
     Ok((
         rest,
@@ -148,8 +174,8 @@ fn function(input: &str) -> NodeResult {
 
 fn call(input: &str) -> NodeResult {
     let (rest, (name, num_args)) = preceded(
-        tuple((tag_no_case("CALL"), space1)),
-        tuple((identifier, preceded(space1, nom_u64))),
+        tuple((tag_no_case("CALL"), within_node)),
+        tuple((identifier, preceded(within_node, nom_u64))),
     )(input)?;
     Ok((
         rest,
@@ -164,7 +190,7 @@ noarg_node!(ret, "RET", IrNode::Ret);
 
 fn intrinsic(input: &str) -> NodeResult {
     let (rest, intrinsic) = preceded(
-        tuple((tag_no_case("INTRINSIC"), space1)),
+        tuple((tag_no_case("INTRINSIC"), within_node)),
         alt((
             value(Intrinsic::PrintInt, tag_no_case("PRINT_INT")),
             value(Intrinsic::PrintString, tag_no_case("PRINT_STRING")),
@@ -176,12 +202,12 @@ fn intrinsic(input: &str) -> NodeResult {
 }
 
 fn push(input: &str) -> NodeResult {
-    let (rest, reg) = preceded(tuple((tag_no_case("PUSH"), space1)), nom_i64)(input)?;
+    let (rest, reg) = preceded(tuple((tag_no_case("PUSH"), within_node)), nom_i64)(input)?;
     Ok((rest, IrNode::Push { reg }))
 }
 
 fn pop(input: &str) -> NodeResult {
-    let (rest, reg) = preceded(tuple((tag_no_case("POP"), space1)), nom_i64)(input)?;
+    let (rest, reg) = preceded(tuple((tag_no_case("POP"), within_node)), nom_i64)(input)?;
     Ok((rest, IrNode::Pop { reg }))
 }
 
@@ -198,11 +224,12 @@ pub fn node(input: &str) -> NodeResult {
 }
 
 pub fn program(input: &str) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&str>>> {
-    // TODO: Support comments.
+    use nom::character::complete::multispace0;
+    // TODO: Try doing this more simply. Do I need to consider the separators differently from the starting and ending whitespace?
     let (rest, prog) = all_consuming(delimited(
-        multispace0,
-        separated_list0(multispace1, node),
-        multispace0,
+        alt((between_nodes, multispace0)),
+        separated_list0(between_nodes, node),
+        alt((between_nodes, multispace0)),
     ))(input)?;
     assert_eq!(rest, ""); // Surely this is redundant because of how all-consuming works.
     Ok(prog)
@@ -213,10 +240,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn inside_string_test() {
+        assert_eq!(inside_string(""), Ok(("", "".into())));
+        assert_eq!(inside_string(r#"\""#), Ok(("", r#"""#.into())));
+        assert_eq!(
+            inside_string(r#"I have some literal quotes \" \"."#),
+            Ok(("", r#"I have some literal quotes " "."#.into()))
+        );
+        assert_eq!(
+            inside_string(r"I \\ have some \\ literal \\\\ backslashes."),
+            Ok(("", r"I \ have some \ literal \\ backslashes.".into()))
+        );
+        assert_eq!(
+            inside_string(r#"Some \\ \" \"\" literal backslashes\\\\ and quotes."#),
+            Ok((
+                "",
+                r#"Some \ " "" literal backslashes\\ and quotes."#.into()
+            ))
+        );
+
+        assert_eq!(
+            inside_string(r#"I don't include the unescaped quote.""#),
+            Ok((r#"""#, "I don't include the unescaped quote.".into()))
+        );
+        assert_eq!(
+            inside_string(r#"I don't get matched because I have an invalid escape sequence: \n "#),
+            Ok((
+                r#"I don't get matched because I have an invalid escape sequence: \n "#,
+                "".into()
+            ))
+        );
+        assert_eq!(
+            inside_string(r#"I don't get matched because I end in a backslash \"#),
+            Ok((
+                r#"I don't get matched because I end in a backslash \"#,
+                "".into()
+            ))
+        );
+    }
+
+    #[test]
     fn string_literal_test() {
         // TODO: Add more tests.
-        assert_eq!(string_literal("\" \""), Ok(("", " ".into())));
-        assert_eq!(string_literal("\"\""), Ok(("", "".into())));
+        assert_eq!(string_literal(r#"" ""#), Ok(("", " ".into())));
+        assert_eq!(
+            string_literal(r#""I don't include the unescaped quote.""#),
+            Ok(("", "I don't include the unescaped quote.".into()))
+        );
+        assert_eq!(string_literal(r#""""#), Ok(("", "".into())));
+        assert_eq!(string_literal(r#""\"""#), Ok(("", r#"""#.into())));
+        assert_eq!(
+            string_literal(r#""\"Around and around, good fun\"""#),
+            Ok(("", r#""Around and around, good fun""#.into()))
+        );
     }
 
     #[test]
@@ -559,6 +635,119 @@ mod tests {
                 IrNode::Sconst("with \n newlines \n".into()),
                 IrNode::Sconst("\\ with backslashes \\".into()),
                 IrNode::Iconst(20),
+            ])
+        );
+    }
+
+    #[test]
+    fn single_line_comment_test() {
+        assert!(single_line_comment("").is_err()); // The empty string is not a single-line comment.
+
+        // Single line comments must start precisely with a hash, but there can
+        // be space(s) between the end of a node and a single-line comment
+        // handled by `between_nodes`:
+        assert!(single_line_comment(" #").is_err());
+        assert!(single_line_comment("//").is_err()); // Sorry, C fans.
+        assert!(single_line_comment("input").is_err());
+
+        assert_eq!(single_line_comment("#"), Ok(("", ""))); // The # is not part of the result of the comment.
+        assert_eq!(single_line_comment("#  Hello"), Ok(("", "  Hello")));
+        assert_eq!(single_line_comment("# Hello\n"), Ok(("\n", " Hello"))); // Single-line comments end before the first newline.
+        assert_eq!(
+            single_line_comment("# First single-line comment\n # Second single line comment"),
+            Ok((
+                "\n # Second single line comment",
+                " First single-line comment"
+            ))
+        );
+        assert_eq!(
+            single_line_comment(
+                "# ;laisupowielkjbo982349867q345\\ \n Oh boy this is not part of that comment"
+            ),
+            Ok((
+                "\n Oh boy this is not part of that comment",
+                " ;laisupowielkjbo982349867q345\\ "
+            ))
+        );
+    }
+
+    #[test]
+    fn multi_line_comment_test() {
+        assert!(multi_line_comment("").is_err()); // Empty string is not a multi-line comment.
+        assert!(multi_line_comment("/*").is_err()); // Multi-line comments must be terminated.
+
+        assert_eq!(multi_line_comment("/**/"), Ok(("", ""))); // The delimiters are not part of the result of the comment.
+        assert_eq!(multi_line_comment("/* */"), Ok(("", " ")));
+        assert_eq!(
+            multi_line_comment("/* Hello I can be anything !! sconst!*/"),
+            Ok(("", " Hello I can be anything !! sconst!"))
+        );
+        assert_eq!(
+            multi_line_comment("/* SCONST ICONST */"),
+            Ok(("", " SCONST ICONST "))
+        );
+        assert_eq!(multi_line_comment("/* Jump */  "), Ok(("  ", " Jump ")));
+
+        assert_eq!(multi_line_comment("/* */ */"), Ok((" */", " "))); // Multi-line comments end at the first ending delimiter.
+        assert_eq!(
+            multi_line_comment("/* \n\n \\n \\\" */"),
+            Ok(("", " \n\n \\n \\\" "))
+        ); // Nothing is special in a multi-line comment.
+    }
+
+    #[test]
+    fn programs_with_single_line_comments() {
+        assert_eq!(
+            program(
+                r##"Sconst "Have a string, why don'tcha "
+                Iconst -30 # Very important comment
+                L0: sconst "\"Around and around, good fun\"" # Just like malloc! 
+                JUMP L0 
+                # This next bit is incredibly confusing, but must not be changed!!!
+                # TODO: Fix.
+                BRANCHZERO L1
+                L1:
+                "##
+            ),
+            Ok(vec![
+                IrNode::Sconst("Have a string, why don'tcha ".into()),
+                IrNode::Iconst(-30),
+                IrNode::Label(Label::named("L0")),
+                IrNode::Sconst("\"Around and around, good fun\"".into()),
+                IrNode::Jump(Label::named("L0")),
+                IrNode::BranchZero(Label::named("L1")),
+                IrNode::Label(Label::named("L1")),
+            ])
+        );
+    }
+
+    #[test]
+    fn programs_with_any_kind_of_comment() {
+        assert_eq!(
+            program(
+                "Iconst 40\n\
+                 Jump L1\n\
+                 # Single line comment on it's own line.\n\
+                 \n\
+                 /* Multi-line comment on one line. */\n\
+                 \n\
+                 \n\
+                 /* Multi-line comment spanning\n\
+                    two lines. */\n\
+                 Iconst 20\n\
+                 Iconst 40\n\
+                 Add\n\
+                 Intrinsic print_int\n\
+                 Intrinsic exit"
+            ),
+            Ok(vec![
+                IrNode::Iconst(40),
+                IrNode::Jump(Label::named("L1")),
+                IrNode::Iconst(20),
+                IrNode::Iconst(40),
+                IrNode::Add,
+                IrNode::Intrinsic(Intrinsic::PrintInt),
+                IrNode::Intrinsic(Intrinsic::Exit)
             ])
         );
     }
