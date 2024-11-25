@@ -1,6 +1,6 @@
 use nom::{
     branch::alt,
-    bytes::complete::{escaped_transform, tag_no_case, take_while},
+    bytes::complete::{escaped_transform, tag_no_case, take_while1},
     character::complete::{
         char as nom_char, i64 as nom_i64, multispace0, multispace1, none_of, space1, u64 as nom_u64,
     },
@@ -14,8 +14,7 @@ use crate::ir_definition::{Intrinsic, IrNode, Label};
 type NodeResult<'a> = IResult<&'a str, IrNode>;
 
 fn identifier(input: &str) -> IResult<&str, &str> {
-    // TODO: Make this require there to be at least one thing in the input.
-    take_while(|c| char::is_alphanumeric(c) || c == '$' || c == '_')(input)
+    take_while1(|c| char::is_alphanumeric(c) || c == '$' || c == '_')(input)
 }
 
 fn string_literal(input: &str) -> IResult<&str, String> {
