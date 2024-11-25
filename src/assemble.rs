@@ -25,8 +25,7 @@ fn string_literal(input: &str) -> IResult<&str, String> {
     // uglier.
     let (rest, text) = delimited(
         nom_char('\"'),
-        opt(
-        escaped_transform(
+        opt(escaped_transform(
             none_of("\\\""),
             '\\',
             alt((value("\\", tag("\\")), value("\"", tag("\"")))),
@@ -278,13 +277,7 @@ mod tests {
             ))
         );
 
-        assert_eq!(
-            node("SCONST \"\""),
-            Ok((
-                "",
-                IrNode::Sconst("".into())
-            ))
-        );
+        assert_eq!(node("SCONST \"\""), Ok(("", IrNode::Sconst("".into()))));
 
         assert_eq!(
             node("SCONST \" with \n newlines\n\""),
