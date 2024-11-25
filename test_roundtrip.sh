@@ -14,12 +14,12 @@ PRINTED='printed.aves_text'
 REASSEMBLED='rust_out.aves_bytecode'
 XXD_BYTECODE_DIFFERENCE=xxd_bytecode_difference
 TEXT_DIFFERENCE=text_difference
-IR_BYTECODE_DIR=ir_bytecode
+IR_DIR=ir_samples
 
 GREEN='\033[42m'
 RESET='\033[0m'
 
-for ORIGINAL in $(find $IR_BYTECODE_DIR -type f | sort)
+for ORIGINAL in $(find $IR_DIR -type f | grep ".aves_bytecode$" | sort)
 do
     echo "Checking $ORIGINAL"
     $PRINT --bytecode $ORIGINAL > $PRINTED 2> /dev/null
@@ -31,4 +31,4 @@ do
     rm $PRINTED $REASSEMBLED
 done
 
-echo "EVERYTHING IS PASSING! :)"
+echo -e "${GREEN}EVERYTHING IS PASSING! :)${RESET}"
