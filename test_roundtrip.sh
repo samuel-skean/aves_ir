@@ -24,7 +24,7 @@ do
     echo "Checking $ORIGINAL"
     $PRINT --bytecode $ORIGINAL > $PRINTED 2> /dev/null
     $ASSEMBLE --text $PRINTED --output-bytecode $REASSEMBLED &> /dev/null
-    diff <($PRINT --bytecode rust_out.aves_bytecode 2> /dev/null) printed.aves_text > $TEXT_DIFFERENCE
+    diff <($PRINT --bytecode $REASSEMBLED 2> /dev/null) $PRINTED > $TEXT_DIFFERENCE
     # Is diffing the result of xxd always gonna work?
     diff <(xxd $REASSEMBLED) <(xxd $ORIGINAL) > $XXD_BYTECODE_DIFFERENCE
     
