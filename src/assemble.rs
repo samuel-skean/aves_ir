@@ -199,6 +199,7 @@ pub fn node(input: &str) -> NodeResult {
 }
 
 pub fn program(input: &str) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&str>>> {
+    // TODO: Support comments.
     let (rest, prog) = all_consuming(delimited(
         multispace0,
         separated_list0(multispace1, node),

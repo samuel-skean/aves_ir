@@ -38,7 +38,8 @@ impl WriteBytecode for i64 {
 
 impl WriteBytecode for u64 {
     fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()> {
-        u32::try_from(*self)
+        // This is an i32 on purpose, because the C code expects an int, not an unsigned int.
+        i32::try_from(*self)
             .expect("Integer too big for serialized bytecode format.")
             .write_bytecode(out)
     }
