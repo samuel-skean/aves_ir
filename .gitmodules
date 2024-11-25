@@ -1,0 +1,3 @@
+[submodule "c_code"]
+	path = c_code
+	url = git@github.com:samuel-skean/aves_ir_c.git
