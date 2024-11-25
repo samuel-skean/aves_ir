@@ -6,7 +6,7 @@ fn main() {
     // This code is copied from a tutorial on rust-bindgen, modified minimally for these files.
 
     // This is the directory where the `c` library is located.
-    let libdir_path = PathBuf::from("aves_ir_c")
+    let libdir_path = PathBuf::from("c_code")
         // Canonicalize the path as `rustc-link-search` requires an absolute
         // path.
         .canonicalize()

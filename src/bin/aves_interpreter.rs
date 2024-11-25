@@ -49,6 +49,7 @@ fn main() -> io::Result<()> {
             let mut text_program = String::new();
             text_file.read_to_string(&mut text_program)?;
             prog = Some(assemble::program(&text_program).expect("Parsing error."));
+            // TODO: Interpret the code.
             println!("Program was: {:?}", prog);
         }
         CliOptions {

@@ -4,7 +4,7 @@ use nom::{
     character::complete::{
         char as nom_char, i64 as nom_i64, multispace0, multispace1, none_of, space1, u64 as nom_u64,
     },
-    combinator::{all_consuming, value},
+    combinator::{all_consuming, opt, value},
     multi::separated_list0,
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
@@ -20,15 +20,21 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 
 fn string_literal(input: &str) -> IResult<&str, String> {
     use nom::bytes::complete::tag;
-    delimited(
+    // STRETCH: There's gotta be a nicer way to handle potentially empty
+    // strings. escaped_transform seems to happily deal with empty strings, but
+    // it doesn't work within delimited unless I use opt, which makes this much
+    // uglier.
+    let (rest, text) = delimited(
         nom_char('\"'),
+        opt(
         escaped_transform(
             none_of("\\\""),
             '\\',
             alt((value("\\", tag("\\")), value("\"", tag("\"")))),
-        ),
+        )),
         nom_char('\"'),
-    )(input)
+    )(input)?;
+    Ok((rest, text.unwrap_or("".into())))
 }
 
 macro_rules! noarg_node {
@@ -208,9 +214,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn string_lit() {
+    fn string_literal_test() {
+        // TODO: Add more tests.
         assert_eq!(string_literal("\" \""), Ok(("", " ".into())));
         assert_eq!(string_literal("\"\""), Ok(("", "".into())));
+    }
+
+    #[test]
+    fn identifier_test() {
+        assert_eq!(identifier("hello"), Ok(("", "hello")));
+        assert_eq!(identifier("$bruh"), Ok(("", "$bruh")));
+        assert_eq!(identifier("_bruh"), Ok(("", "_bruh")));
+        assert_eq!(identifier("123br21"), Ok(("", "123br21")));
+        assert_eq!(identifier("hello goodbye"), Ok((" goodbye", "hello")));
+
+        assert!(identifier("").is_err());
     }
 
     #[test]
