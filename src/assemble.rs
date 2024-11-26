@@ -67,6 +67,11 @@ macro_rules! noarg_node {
     };
 }
 
+
+// Each instruction function should not take trailing whitespace. That should be
+// left to the thing that processes multiple instructions, that can take
+// newlines and spaces.
+
 fn iconst(input: &str) -> NodeResult {
     let (rest, i) = preceded(tuple((tag_no_case("ICONST"), within_node)), nom_i64)(input)?;
     Ok((rest, IrNode::Iconst(i)))
@@ -752,5 +757,3 @@ mod tests {
         );
     }
 }
-
-// Each instruction function should not take trailing whitespace. That should be left to the thing that processes multiple instructions, that can take newlines and spaces.
