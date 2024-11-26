@@ -1,2 +1,7 @@
-SCONST "Hello I have a
+	SCONST "Hello I have a
 newline"
+	SCONST "Multiple \" \" literal \"\" double \"quotes\""
+	SCONST "Multiple \\ literal \\ backslashes \\\\\\"
+	SCONST "ALL THE ESCAPES!! \\ \" \\\" \\\\ 
+
+	\\ \\ \"\""
