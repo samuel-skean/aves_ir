@@ -1,6 +1,6 @@
 use nom::{
     branch::alt,
-    bytes::complete::{escaped_transform, tag_no_case, take_while, take_while1},
+    bytes::complete::{escaped_transform, tag_no_case, take_till, take_while1},
     character::complete::{char as nom_char, i64 as nom_i64, none_of, u64 as nom_u64},
     combinator::{all_consuming, map, opt, value},
     multi::{many0_count, many1_count, separated_list0},
@@ -41,7 +41,9 @@ fn multi_line_comment(input: &str) -> IResult<&str, &str> {
 // Does not consume the thing that ended the single_line_comment (either a newline or the end of the file).
 fn single_line_comment(input: &str) -> IResult<&str, &str> {
     use nom::bytes::complete::tag;
-    preceded(tag("#"), take_while(|c| c != '\n'))(input)
+    
+    // TODO: Try making this use `terminated`, `line_ending`, and `eof`.
+    preceded(tag("#"), take_till(|c| c == '\n' || c == '\r'))(input)
 }
 
 fn within_node(input: &str) -> IResult<&str, &str> {
@@ -229,12 +231,11 @@ pub fn node(input: &str) -> NodeResult {
 }
 
 pub fn program(input: &str) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&str>>> {
-    use nom::character::complete::multispace0;
     // TODO: Try doing this more simply. Do I need to consider the separators differently from the starting and ending whitespace?
     let (rest, prog) = all_consuming(delimited(
-        alt((between_nodes, multispace0)),
+        opt(between_nodes),
         separated_list0(between_nodes, node),
-        alt((between_nodes, multispace0)),
+        opt(between_nodes),
     ))(input)?;
     assert_eq!(rest, ""); // Surely this is redundant because of how all-consuming works.
     Ok(prog)
