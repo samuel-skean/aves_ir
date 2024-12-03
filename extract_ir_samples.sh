@@ -13,18 +13,24 @@ set -e # Fail immediately when any command fails.
 EXEC=interp
 COMPILER=bluejaycc
 TEST_DIR=tests
-IR_BYTECODE_DIR=ir_bytecode
+IR_SAMPLES_DIR=ir/from_a4
+SHOULD_EXTRACT_EXPECTED_OUTPUT=true # Only extract *program* output.
 
 make clean && make
 
 for T in $(ls $TEST_DIR)
 do
-  mkdir -p "$IR_BYTECODE_DIR/$T"
+  mkdir -p "$IR_SAMPLES_DIR/$T"
   for F in $(ls $TEST_DIR/$T | grep ".bluejay$" | grep pass) # Only capture ir from passing tests.
   do
     TESTFILE="$TEST_DIR/$T/$F"
     # TODO: I don't quite understand how this line works. Is it a here document?
-    IRFILE=$(sed 's/.bluejay/.aves_bytecode/g' <<<"$IR_BYTECODE_DIR/$T/$F")
+    IRFILE=$(sed 's/.bluejay/.aves_bytecode/g' <<<"$IR_SAMPLES_DIR/$T/$F")
     ./$COMPILER $TESTFILE $IRFILE
+    if $SHOULD_EXTRACT_EXPECTED_OUTPUT # This does not cause the whole script to fail even when it evaluates to false.
+    then
+      EXPECTEDFILE_NAMEONLY=$(sed 's/.bluejay/.expected/g' <<<"$F")
+      cp "$TEST_DIR/$T/$EXPECTEDFILE_NAMEONLY" "$IR_SAMPLES_DIR/$T/$EXPECTEDFILE_NAMEONLY"
+    fi
   done
 done
