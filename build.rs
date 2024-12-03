@@ -13,28 +13,37 @@ fn main() {
         .expect("cannot canonicalize path");
 
     // This is the path to the `c` headers file.
-    let headers_path = libdir_path.join("ir.h");
-    let headers_path_str = headers_path.to_str().expect("Path is not a valid string");
+    let headers_path = libdir_path.join("include");
+    let ir_h_path = headers_path.join("ir.h"); // TODO: Figure out what the issue is that prevents all the headers from working.
 
+    let src_path = libdir_path.join("src");
+    // MY ADDITION: This is the path to the c file.
+    let ir_c_path = src_path.join("ir.c");
+    let build_path = libdir_path.join("build");
     // This is the path to the intermediate object file for our library.
-    let obj_path = libdir_path.join("ir.o");
+    let ir_o_path = build_path.join("ir.o");
     // This is the path to the static library file.
-    let lib_path = libdir_path.join("libir.a");
+    let lib_path = build_path.join("libaves.a");
+
+    // MY ADDITION: Tell Cargo to re-run the script if any of c files change:
+    println!("cargo::rerun-if-changed={}", src_path.to_str().unwrap());
 
     // Tell cargo to look for shared libraries in the specified directory
-    println!("cargo:rustc-link-search={}", libdir_path.to_str().unwrap());
+    println!("cargo::rustc-link-search={}", build_path.to_str().unwrap());
 
-    // Tell cargo to tell rustc to link our `ir` library. Cargo will
-    // automatically know it must look for a `libir.a` file.
-    println!("cargo:rustc-link-lib=ir");
+    // Tell cargo to tell rustc to link our `aves` library. Cargo will
+    // automatically know it must look for a `libaves.a` file.
+    println!("cargo::rustc-link-lib=aves");
 
     // Run `clang` to compile the `ir.c` file into a `ir.o` object file.
     // Unwrap if it is not possible to spawn the process.
     if !std::process::Command::new("clang")
         .arg("-c")
         .arg("-o")
-        .arg(&obj_path)
-        .arg(libdir_path.join("ir.c"))
+        .arg(&ir_o_path)
+        .arg(&ir_c_path)
+        .arg("-I")
+        .arg(&headers_path)
         .output()
         .expect("could not spawn `clang`")
         .status
@@ -49,7 +58,7 @@ fn main() {
     if !std::process::Command::new("ar")
         .arg("rcs")
         .arg(lib_path)
-        .arg(obj_path)
+        .arg(ir_o_path)
         .output()
         .expect("could not spawn `ar`")
         .status
@@ -65,7 +74,7 @@ fn main() {
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate
         // bindings for.
-        .header(headers_path_str)
+        .header(ir_h_path.to_str().unwrap())
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
