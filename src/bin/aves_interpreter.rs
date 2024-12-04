@@ -7,6 +7,12 @@ use std::{
 use aves_ir::{assemble, bindings, write_bytecode::dump_bytecode};
 use clap::Parser;
 
+// TODO: This should have two mutually exclusive options: interpret and print.
+// These should be mutually exclusive since they both print to standard out.
+// Interpret prints the result of interpreting the program to standard out, and
+// print prints the human-readable form of the program to standard out. Look at
+// the clap docs to see if there's a way to map this sort of thing to an enum,
+// which would be ideal.
 #[derive(Parser)]
 struct CliOptions {
     #[arg(short, long = "bytecode", required_unless_present("text_path"))]
