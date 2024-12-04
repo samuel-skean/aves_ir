@@ -14,59 +14,28 @@ fn main() {
 
     // This is the path to the `c` headers file.
     let headers_path = libdir_path.join("include");
-    let ir_h_path = headers_path.join("ir.h"); // TODO: Figure out what the issue is that prevents all the headers from working.
-
+    // Is the solution to not owning this necessarily something without a lambda?
+    let header_file_paths = headers_path.read_dir().expect("headers was not a directory").map(|e| {
+        e.expect("Something wrong with a header file's directory entry.").path()
+    });
+    // It's definitely not useful to focus on this now, but it is irritating that it can't borrow the path.
+    let header_file_path_strings = header_file_paths.map(|path| {
+        path.to_str().unwrap().to_owned()
+    });
     let src_path = libdir_path.join("src");
-    // MY ADDITION: This is the path to the c file.
-    let ir_c_path = src_path.join("ir.c");
+    let src_file_paths = src_path.read_dir().expect("src was not a directory").map(|e| {
+        e.expect("Something wrong with a source file's directory entry.").path()
+    });
     let build_path = libdir_path.join("build");
-    // This is the path to the intermediate object file for our library.
-    let ir_o_path = build_path.join("ir.o");
-    // This is the path to the static library file.
-    let lib_path = build_path.join("libaves.a");
 
     // MY ADDITION: Tell Cargo to re-run the script if any of c files change:
     println!("cargo::rerun-if-changed={}", src_path.to_str().unwrap());
-
-    // Tell cargo to look for shared libraries in the specified directory
-    println!("cargo::rustc-link-search={}", build_path.to_str().unwrap());
-
-    // Tell cargo to tell rustc to link our `aves` library. Cargo will
-    // automatically know it must look for a `libaves.a` file.
-    println!("cargo::rustc-link-lib=aves");
-
-    // Run `clang` to compile the `ir.c` file into a `ir.o` object file.
-    // Unwrap if it is not possible to spawn the process.
-    if !std::process::Command::new("clang")
-        .arg("-c")
-        .arg("-o")
-        .arg(&ir_o_path)
-        .arg(&ir_c_path)
-        .arg("-I")
-        .arg(&headers_path)
-        .output()
-        .expect("could not spawn `clang`")
-        .status
-        .success()
-    {
-        // Panic if the command was not successful.
-        panic!("could not compile object file");
-    }
-
-    // Run `ar` to generate the `libir.a` file from the `ir.o` file.
-    // Unwrap if it is not possible to spawn the process.
-    if !std::process::Command::new("ar")
-        .arg("rcs")
-        .arg(lib_path)
-        .arg(ir_o_path)
-        .output()
-        .expect("could not spawn `ar`")
-        .status
-        .success()
-    {
-        // Panic if the command was not successful.
-        panic!("could not emit library file");
-    }
+    
+    cc::Build::new()
+        .files(src_file_paths)
+        .include(headers_path)
+        .out_dir(build_path)
+        .compile("aves");
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -74,7 +43,7 @@ fn main() {
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate
         // bindings for.
-        .header(ir_h_path.to_str().unwrap())
+        .headers(header_file_path_strings)
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
