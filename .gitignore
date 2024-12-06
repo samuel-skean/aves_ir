@@ -6,6 +6,7 @@
 # Roundtrip testing artifacts:
 out.aves_text
 rust_out.aves_text
+rust_out.aves_bytecode
 printed.aves_text
 xxd_bytecode_difference
 text_difference
