@@ -3,7 +3,7 @@ use std::io;
 
 use crate::ir_definition::{Intrinsic, IrNode, Label};
 
-pub fn dump_bytecode(ir_list: &[IrNode], out: &mut impl io::Write) -> io::Result<()> {
+pub fn write_bytecode(ir_list: &[IrNode], out: &mut impl io::Write) -> io::Result<()> {
     for node in ir_list {
         node.write_bytecode(out)?;
     }

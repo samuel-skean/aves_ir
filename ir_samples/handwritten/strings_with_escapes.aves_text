@@ -1,7 +1,20 @@
 	SCONST "Hello I have a
 newline"
+SCONST "
+"
 	SCONST "Multiple \" \" literal \"\" double \"quotes\""
+SCONST "
+"
 	SCONST "Multiple \\ literal \\ backslashes \\\\\\"
+SCONST "
+"
 	SCONST "ALL THE ESCAPES!! \\ \" \\\" \\\\ 
 
 	\\ \\ \"\""
+	INTRINSIC PRINT_STRING
+	INTRINSIC PRINT_STRING
+	INTRINSIC PRINT_STRING
+	INTRINSIC PRINT_STRING
+	INTRINSIC PRINT_STRING
+	INTRINSIC PRINT_STRING
+	INTRINSIC PRINT_STRING
