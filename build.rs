@@ -15,22 +15,28 @@ fn main() {
     // This is the path to the `c` headers file.
     let headers_path = libdir_path.join("include");
     // Is the solution to not owning this necessarily something without a lambda?
-    let header_file_paths = headers_path.read_dir().expect("headers was not a directory").map(|e| {
-        e.expect("Something wrong with a header file's directory entry.").path()
-    });
+    let header_file_paths = headers_path
+        .read_dir()
+        .expect("headers was not a directory")
+        .map(|e| {
+            e.expect("Something wrong with a header file's directory entry.")
+                .path()
+        });
     // It's definitely not useful to focus on this now, but it is irritating that it can't borrow the path.
-    let header_file_path_strings = header_file_paths.map(|path| {
-        path.to_str().unwrap().to_owned()
-    });
+    let header_file_path_strings = header_file_paths.map(|path| path.to_str().unwrap().to_owned());
     let src_path = libdir_path.join("src");
-    let src_file_paths = src_path.read_dir().expect("src was not a directory").map(|e| {
-        e.expect("Something wrong with a source file's directory entry.").path()
-    });
+    let src_file_paths = src_path
+        .read_dir()
+        .expect("src was not a directory")
+        .map(|e| {
+            e.expect("Something wrong with a source file's directory entry.")
+                .path()
+        });
     let build_path = libdir_path.join("build");
 
     // MY ADDITION: Tell Cargo to re-run the script if any of c files change:
     println!("cargo::rerun-if-changed={}", src_path.to_str().unwrap());
-    
+
     cc::Build::new()
         .files(src_file_paths)
         .include(headers_path)

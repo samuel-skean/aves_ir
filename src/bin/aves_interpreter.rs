@@ -1,7 +1,8 @@
 use std::{
     fs::File,
     io::{self, stdin, BufReader, BufWriter, Read},
-    os::fd::AsRawFd as _, process::{self, Stdio},
+    os::fd::AsRawFd as _,
+    process::{self, Stdio},
 };
 
 use aves_ir::{assemble, bindings, write_bytecode::write_bytecode};
@@ -60,7 +61,7 @@ fn main() -> io::Result<()> {
                 text_file.read_to_string(&mut text_program)?;
                 text_program
             };
-            
+
             // It is not ideal that we're sometimes writing the bytecode twice when we could be doing so once.
             let prog = assemble::program(&text_program).expect("Parsing error.");
             if let Some(output_bytecode_path) = output_bytecode_path {
@@ -68,15 +69,17 @@ fn main() -> io::Result<()> {
                 write_bytecode(&prog, &mut output_bytecode_file)?;
             }
 
-            let mut child_cmd = process::Command::new(std::env::current_exe().expect("Can't find current executable."));
+            let mut child_cmd = process::Command::new(
+                std::env::current_exe().expect("Can't find current executable."),
+            );
             if print {
                 child_cmd.arg("--print");
             }
             child_cmd.args(["--bytecode", "-"]);
             let mut child = child_cmd.stdin(Stdio::piped()).spawn()?;
             let mut child_stdin = child.stdin.as_ref().expect("Could not get child's stdin.");
-            write_bytecode(&prog,&mut child_stdin)
-                    .expect("Could not write bytecode into child's stdin.");
+            write_bytecode(&prog, &mut child_stdin)
+                .expect("Could not write bytecode into child's stdin.");
             child.wait().expect("Child process (interpreter) failed.");
         }
         CliOptions {

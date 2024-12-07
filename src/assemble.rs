@@ -41,7 +41,7 @@ fn multi_line_comment(input: &str) -> IResult<&str, &str> {
 // Does not consume the thing that ended the single_line_comment (either a newline or the end of the file).
 fn single_line_comment(input: &str) -> IResult<&str, &str> {
     use nom::bytes::complete::tag;
-    
+
     // TODO: Try making this use `terminated`, `line_ending`, and `eof`.
     preceded(tag("#"), take_till(|c| c == '\n' || c == '\r'))(input)
 }
@@ -68,7 +68,6 @@ macro_rules! noarg_node {
         }
     };
 }
-
 
 // Each instruction function should not take trailing whitespace. That should be
 // left to the thing that processes multiple instructions, that can take
