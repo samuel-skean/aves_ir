@@ -102,6 +102,7 @@ fn main() -> io::Result<()> {
                 } else {
                     bindings::interpret(c_ir_node);
                 }
+                bindings::free_list_ir(c_ir_node);
             }
         }
     };
