@@ -28,20 +28,30 @@ fn main() {
     let src_file_paths = src_path
         .read_dir()
         .expect("src was not a directory")
-        .map(|e| {
-            e.expect("Something wrong with a source file's directory entry.")
-                .path()
+        .filter_map(|e| {
+            let path = e
+                .expect("Something wrong with a source file's directory entry.")
+                .path();
+            // Filter out .h files.
+            if path
+                .extension()
+                .expect("A C source file does not have an extension.")
+                == "c"
+            {
+                Some(path)
+            } else {
+                None
+            }
         });
     let build_path = libdir_path.join("build");
 
     // MY ADDITION: Tell Cargo to re-run the script if any of c files change:
     println!("cargo::rerun-if-changed={}", src_path.to_str().unwrap());
 
-    cc::Build::new()
-        .files(src_file_paths)
+    let mut build = cc::Build::new();
+    build.files(src_file_paths)
         .include(headers_path)
         .out_dir(build_path)
-        .flag("-fsanitize=address")
         .flag("-O0")
         .flag("-Wall")
         .flag("-ggdb")
@@ -49,10 +59,16 @@ fn main() {
         .flag("-Werror")
         .flag("-std=c18")
         .flag("-Wpedantic")
-        .flag("-Wno-unused-parameter")
-        .compile("aves");
+        .flag("-Wno-unused-parameter");
 
-    println!("cargo::rustc-link-lib=asan");
+    // Libasan just...doesn't work on aarch64 macOS, as of now. I really thought we were through the transition.
+    if cfg!(not(all(target_os = "macos", target_arch = "aarch64"))) {
+        build.flag("-fsanitize=address");
+        println!("cargo::rustc-link-lib=asan");
+    }
+
+    build.compile("aves");
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
