@@ -8,8 +8,8 @@ use nom::{
     IResult,
 };
 
-use crate::ir_definition::{Intrinsic, IrNode, Label};
-type NodeResult<'a> = IResult<&'a str, IrNode>;
+use crate::ir_definition::{Intrinsic, Instruction, Label};
+type NodeResult<'a> = IResult<&'a str, Instruction>;
 
 fn identifier(input: &str) -> IResult<&str, &str> {
     take_while1(|c| char::is_alphanumeric(c) || c == '$' || c == '_')(input)
@@ -75,30 +75,30 @@ macro_rules! noarg_node {
 
 fn iconst(input: &str) -> NodeResult {
     let (rest, i) = preceded(tuple((tag_no_case("ICONST"), within_node)), nom_i64)(input)?;
-    Ok((rest, IrNode::Iconst(i)))
+    Ok((rest, Instruction::Iconst(i)))
 }
 
 fn sconst(input: &str) -> NodeResult {
     let (rest, transformed_text) =
         preceded(tuple((tag_no_case("SCONST"), within_node)), string_literal)(input)?;
-    Ok((rest, IrNode::Sconst(transformed_text.into())))
+    Ok((rest, Instruction::Sconst(transformed_text.into())))
 }
 
-noarg_node!(nop, "NOP", IrNode::Nop);
-noarg_node!(add, "ADD", IrNode::Add);
-noarg_node!(sub, "SUB", IrNode::Sub);
-noarg_node!(mul, "MUL", IrNode::Mul);
-noarg_node!(div, "DIV", IrNode::Div);
-noarg_node!(mod_, "MOD", IrNode::Mod);
-noarg_node!(bor, "BOR", IrNode::Bor);
-noarg_node!(band, "BAND", IrNode::Band);
-noarg_node!(xor, "XOR", IrNode::Xor);
-noarg_node!(or, "OR", IrNode::Or);
-noarg_node!(and, "AND", IrNode::And);
-noarg_node!(eq, "EQ", IrNode::Eq);
-noarg_node!(lt, "LT", IrNode::Lt);
-noarg_node!(gt, "GT", IrNode::Gt);
-noarg_node!(not, "NOT", IrNode::Not);
+noarg_node!(nop, "NOP", Instruction::Nop);
+noarg_node!(add, "ADD", Instruction::Add);
+noarg_node!(sub, "SUB", Instruction::Sub);
+noarg_node!(mul, "MUL", Instruction::Mul);
+noarg_node!(div, "DIV", Instruction::Div);
+noarg_node!(mod_, "MOD", Instruction::Mod);
+noarg_node!(bor, "BOR", Instruction::Bor);
+noarg_node!(band, "BAND", Instruction::Band);
+noarg_node!(xor, "XOR", Instruction::Xor);
+noarg_node!(or, "OR", Instruction::Or);
+noarg_node!(and, "AND", Instruction::And);
+noarg_node!(eq, "EQ", Instruction::Eq);
+noarg_node!(lt, "LT", Instruction::Lt);
+noarg_node!(gt, "GT", Instruction::Gt);
+noarg_node!(not, "NOT", Instruction::Not);
 
 fn reserve(input: &str) -> NodeResult {
     let (start_of_string_or_null, (name, size)) = preceded(
@@ -114,7 +114,7 @@ fn reserve(input: &str) -> NodeResult {
         let (rest, initial_value) = string_literal(start_of_string_or_null)?;
         return Ok((
             rest,
-            IrNode::ReserveString {
+            Instruction::ReserveString {
                 size,
                 name: name.into(),
                 initial_value,
@@ -122,46 +122,46 @@ fn reserve(input: &str) -> NodeResult {
         ));
     } else {
         let (rest, _) = tag_no_case("(null)")(start_of_string_or_null)?;
-        return Ok((rest, IrNode::ReserveInt { name: name.into() }));
+        return Ok((rest, Instruction::ReserveInt { name: name.into() }));
     }
 }
 
 fn read(input: &str) -> NodeResult {
     let (rest, name) = preceded(tuple((tag_no_case("READ"), within_node)), identifier)(input)?;
-    Ok((rest, IrNode::Read(name.into())))
+    Ok((rest, Instruction::Read(name.into())))
 }
 
 fn write(input: &str) -> NodeResult {
     let (rest, name) = preceded(tuple((tag_no_case("WRITE"), within_node)), identifier)(input)?;
-    Ok((rest, IrNode::Write(name.into())))
+    Ok((rest, Instruction::Write(name.into())))
 }
 
 fn arg_local_read(input: &str) -> NodeResult {
     let (rest, index) =
         preceded(tuple((tag_no_case("ARGLOCAL_READ"), within_node)), nom_u64)(input)?;
-    Ok((rest, IrNode::ArgLocalRead(index)))
+    Ok((rest, Instruction::ArgLocalRead(index)))
 }
 
 fn arg_local_write(input: &str) -> NodeResult {
     let (rest, index) =
         preceded(tuple((tag_no_case("ARGLOCAL_WRITE"), within_node)), nom_u64)(input)?;
-    Ok((rest, IrNode::ArgLocalWrite(index)))
+    Ok((rest, Instruction::ArgLocalWrite(index)))
 }
 
 fn label(input: &str) -> NodeResult {
     let (rest, name) = terminated(identifier, tag_no_case(":"))(input)?;
-    Ok((rest, IrNode::Label(Label::named(name))))
+    Ok((rest, Instruction::Label(Label::named(name))))
 }
 
 fn jump(input: &str) -> NodeResult {
     let (rest, name) = preceded(tuple((tag_no_case("JUMP"), within_node)), identifier)(input)?;
-    Ok((rest, IrNode::Jump(Label::named(name))))
+    Ok((rest, Instruction::Jump(Label::named(name))))
 }
 
 fn branch_zero(input: &str) -> NodeResult {
     let (rest, name) =
         preceded(tuple((tag_no_case("BRANCHZERO"), within_node)), identifier)(input)?;
-    Ok((rest, IrNode::BranchZero(Label::named(name))))
+    Ok((rest, Instruction::BranchZero(Label::named(name))))
 }
 
 fn function(input: &str) -> NodeResult {
@@ -171,7 +171,7 @@ fn function(input: &str) -> NodeResult {
     )(input)?;
     Ok((
         rest,
-        IrNode::Function {
+        Instruction::Function {
             label: Label::named(name),
             num_locs,
         },
@@ -185,14 +185,14 @@ fn call(input: &str) -> NodeResult {
     )(input)?;
     Ok((
         rest,
-        IrNode::Call {
+        Instruction::Call {
             label: Label::named(name),
             num_args,
         },
     ))
 }
 
-noarg_node!(ret, "RET", IrNode::Ret);
+noarg_node!(ret, "RET", Instruction::Ret);
 
 fn intrinsic(input: &str) -> NodeResult {
     let (rest, intrinsic) = preceded(
@@ -204,17 +204,17 @@ fn intrinsic(input: &str) -> NodeResult {
         )),
     )(input)?;
 
-    Ok((rest, IrNode::Intrinsic(intrinsic)))
+    Ok((rest, Instruction::Intrinsic(intrinsic)))
 }
 
 fn push(input: &str) -> NodeResult {
     let (rest, reg) = preceded(tuple((tag_no_case("PUSH"), within_node)), nom_i64)(input)?;
-    Ok((rest, IrNode::Push { reg }))
+    Ok((rest, Instruction::Push { reg }))
 }
 
 fn pop(input: &str) -> NodeResult {
     let (rest, reg) = preceded(tuple((tag_no_case("POP"), within_node)), nom_i64)(input)?;
-    Ok((rest, IrNode::Pop { reg }))
+    Ok((rest, Instruction::Pop { reg }))
 }
 
 pub fn node(input: &str) -> NodeResult {
@@ -229,7 +229,7 @@ pub fn node(input: &str) -> NodeResult {
     ))(input)
 }
 
-pub fn program(input: &str) -> Result<Vec<IrNode>, nom::Err<nom::error::Error<&str>>> {
+pub fn program(input: &str) -> Result<Vec<Instruction>, nom::Err<nom::error::Error<&str>>> {
     // TODO: Try doing this more simply. Do I need to consider the separators differently from the starting and ending whitespace?
     let (rest, prog) = all_consuming(delimited(
         opt(between_nodes),
@@ -315,66 +315,66 @@ mod tests {
     fn noarg_nodes() {
         // I never know how many tests to write...
         // Positive examples:
-        assert_eq!(node("ADD "), Ok((" ", IrNode::Add)));
-        assert_eq!(node("NOP"), Ok(("", IrNode::Nop)));
-        assert_eq!(node("sUb   kdf"), Ok(("   kdf", IrNode::Sub)));
-        assert_eq!(node("Mul "), Ok((" ", IrNode::Mul)));
-        assert_eq!(node("diV  "), Ok(("  ", IrNode::Div)));
-        assert_eq!(node("mod  $$04"), Ok(("  $$04", IrNode::Mod)));
-        assert_eq!(node("BOR      \n"), Ok(("      \n", IrNode::Bor)));
-        assert_eq!(node("bANd  "), Ok(("  ", IrNode::Band)));
-        assert_eq!(node("xor"), Ok(("", IrNode::Xor)));
-        assert_eq!(node("or"), Ok(("", IrNode::Or)));
-        assert_eq!(node("and"), Ok(("", IrNode::And)));
-        assert_eq!(node("eq"), Ok(("", IrNode::Eq)));
-        assert_eq!(node("lT"), Ok(("", IrNode::Lt)));
-        assert_eq!(node("gt"), Ok(("", IrNode::Gt)));
-        assert_eq!(node("Not"), Ok(("", IrNode::Not)));
+        assert_eq!(node("ADD "), Ok((" ", Instruction::Add)));
+        assert_eq!(node("NOP"), Ok(("", Instruction::Nop)));
+        assert_eq!(node("sUb   kdf"), Ok(("   kdf", Instruction::Sub)));
+        assert_eq!(node("Mul "), Ok((" ", Instruction::Mul)));
+        assert_eq!(node("diV  "), Ok(("  ", Instruction::Div)));
+        assert_eq!(node("mod  $$04"), Ok(("  $$04", Instruction::Mod)));
+        assert_eq!(node("BOR      \n"), Ok(("      \n", Instruction::Bor)));
+        assert_eq!(node("bANd  "), Ok(("  ", Instruction::Band)));
+        assert_eq!(node("xor"), Ok(("", Instruction::Xor)));
+        assert_eq!(node("or"), Ok(("", Instruction::Or)));
+        assert_eq!(node("and"), Ok(("", Instruction::And)));
+        assert_eq!(node("eq"), Ok(("", Instruction::Eq)));
+        assert_eq!(node("lT"), Ok(("", Instruction::Lt)));
+        assert_eq!(node("gt"), Ok(("", Instruction::Gt)));
+        assert_eq!(node("Not"), Ok(("", Instruction::Not)));
 
         // Negative examples:
         assert!(node("n ot").is_err());
         assert!(node(" div").is_err()); // Doesn't accept leading whitespace.
-        assert_ne!(node("bor   "), Ok(("", IrNode::Bor))); // Doesn't accept trailing whitespace.
+        assert_ne!(node("bor   "), Ok(("", Instruction::Bor))); // Doesn't accept trailing whitespace.
     }
 
     #[test]
     fn iconst_sconst() {
-        assert_eq!(node("ICONST 50"), Ok(("", IrNode::Iconst(50))));
+        assert_eq!(node("ICONST 50"), Ok(("", Instruction::Iconst(50))));
         // Here is where I deviate from the format as produced by the printer in ir.h, but all I'm doing is adding one escape sequence to strings: \n, for newline.
         assert_eq!(
             node("SCONST \"Hello\""),
-            Ok(("", IrNode::Sconst("Hello".into())))
+            Ok(("", Instruction::Sconst("Hello".into())))
         );
         assert_eq!(
             node("SCONST \"Hello\"\n"),
-            Ok(("\n", IrNode::Sconst("Hello".into())))
+            Ok(("\n", Instruction::Sconst("Hello".into())))
         );
 
         assert_eq!(
             node("SCONST \"Hello I'm a string with no escapes\""),
             Ok((
                 "",
-                IrNode::Sconst("Hello I'm a string with no escapes".into())
+                Instruction::Sconst("Hello I'm a string with no escapes".into())
             ))
         );
 
-        assert_eq!(node("SCONST \"\""), Ok(("", IrNode::Sconst("".into()))));
+        assert_eq!(node("SCONST \"\""), Ok(("", Instruction::Sconst("".into()))));
 
         assert_eq!(
             node("SCONST \" with \n newlines\n\""),
-            Ok(("", IrNode::Sconst(" with \n newlines\n".into())))
+            Ok(("", Instruction::Sconst(" with \n newlines\n".into())))
         );
 
         assert_eq!(
             node("sConst \" with \\\" literal quotes \\\" \""),
-            Ok(("", IrNode::Sconst(" with \" literal quotes \" ".into())))
+            Ok(("", Instruction::Sconst(" with \" literal quotes \" ".into())))
         );
 
         assert_eq!(
             node("SCONST \" \t with tabs and literal \\\\ backslashes\""),
             Ok((
                 "",
-                IrNode::Sconst(" \t with tabs and literal \\ backslashes".into())
+                Instruction::Sconst(" \t with tabs and literal \\ backslashes".into())
             ))
         );
     }
@@ -387,7 +387,7 @@ mod tests {
             node("Reserve var 10 \"Hello world\""),
             Ok((
                 "",
-                IrNode::ReserveString {
+                Instruction::ReserveString {
                     size: 10,
                     name: "var".into(),
                     initial_value: "Hello world".into()
@@ -399,7 +399,7 @@ mod tests {
             node("Reserve 1bruh1 20 \"I \\\\ have a bunch \n \\\" of weird stuff\"  "),
             Ok((
                 "  ",
-                IrNode::ReserveString {
+                Instruction::ReserveString {
                     size: 20,
                     name: "1bruh1".into(),
                     initial_value: "I \\ have a bunch \n \" of weird stuff".into()
@@ -412,7 +412,7 @@ mod tests {
             node("Reserve $$FREAKY_INTERNAL_COMPILER_GLOBAL$$ 4 (null)\t\n"),
             Ok((
                 "\t\n",
-                IrNode::ReserveInt {
+                Instruction::ReserveInt {
                     name: "$$FREAKY_INTERNAL_COMPILER_GLOBAL$$".into()
                 }
             ))
@@ -420,31 +420,31 @@ mod tests {
 
         assert_eq!(
             node("RESERVE $_$ 4 (null)"),
-            Ok(("", IrNode::ReserveInt { name: "$_$".into() }))
+            Ok(("", Instruction::ReserveInt { name: "$_$".into() }))
         )
     }
 
     #[test]
     fn variables() {
         // Globals:
-        assert_eq!(node("WRITE $$$"), Ok(("", IrNode::Write("$$$".into()))));
+        assert_eq!(node("WRITE $$$"), Ok(("", Instruction::Write("$$$".into()))));
 
-        assert_eq!(node("READ _lkas"), Ok(("", IrNode::Read("_lkas".into()))));
+        assert_eq!(node("READ _lkas"), Ok(("", Instruction::Read("_lkas".into()))));
 
         assert_eq!(
             node("read kddk\n \t"),
-            Ok(("\n \t", IrNode::Read("kddk".into())))
+            Ok(("\n \t", Instruction::Read("kddk".into())))
         );
 
         // Locals:
         assert_eq!(
             node("ARGLOCAL_READ 200"),
-            Ok(("", IrNode::ArgLocalRead(200)))
+            Ok(("", Instruction::ArgLocalRead(200)))
         );
 
         assert_eq!(
             node("ARGLOCAL_WRITE  \t 40"),
-            Ok(("", IrNode::ArgLocalWrite(40)))
+            Ok(("", Instruction::ArgLocalWrite(40)))
         );
 
         // Negative locals are not allowed:
@@ -460,29 +460,29 @@ mod tests {
         // Label:
         assert_eq!(
             node("birch:"),
-            Ok(("", IrNode::Label(Label::named("birch"))))
+            Ok(("", Instruction::Label(Label::named("birch"))))
         );
 
-        assert_eq!(node("Sam:"), Ok(("", IrNode::Label(Label::named("Sam")))));
+        assert_eq!(node("Sam:"), Ok(("", Instruction::Label(Label::named("Sam")))));
 
         // Jump:
         assert_eq!(
             node("JUMP L0  h"),
-            Ok(("  h", IrNode::Jump(Label::named("L0"))))
+            Ok(("  h", Instruction::Jump(Label::named("L0"))))
         );
         assert_eq!(
             node("JUMP alskdhjfa"),
-            Ok(("", IrNode::Jump(Label::named("alskdhjfa"))))
+            Ok(("", Instruction::Jump(Label::named("alskdhjfa"))))
         );
 
         // BranchZero:
         assert_eq!(
             node("branchzero l20"),
-            Ok(("", IrNode::BranchZero(Label::named("l20"))))
+            Ok(("", Instruction::BranchZero(Label::named("l20"))))
         );
         assert_eq!(
             node("branchZERO foo\n"),
-            Ok(("\n", IrNode::BranchZero(Label::named("foo"))))
+            Ok(("\n", Instruction::BranchZero(Label::named("foo"))))
         );
     }
 
@@ -494,7 +494,7 @@ mod tests {
             node("FuncTion no_locals 0"),
             Ok((
                 "",
-                IrNode::Function {
+                Instruction::Function {
                     label: Label::named("no_locals"),
                     num_locs: 0
                 }
@@ -505,7 +505,7 @@ mod tests {
             node("FUNCTION some_locals 3"),
             Ok((
                 "",
-                IrNode::Function {
+                Instruction::Function {
                     label: Label::named("some_locals"),
                     num_locs: 3
                 }
@@ -521,7 +521,7 @@ mod tests {
             node("CALL no_args 0\t\tbruh"),
             Ok((
                 "\t\tbruh",
-                IrNode::Call {
+                Instruction::Call {
                     label: Label::named("no_args"),
                     num_args: 0
                 }
@@ -532,7 +532,7 @@ mod tests {
             node("CALL many_args 6"),
             Ok((
                 "",
-                IrNode::Call {
+                Instruction::Call {
                     label: Label::named("many_args"),
                     num_args: 6
                 }
@@ -544,22 +544,22 @@ mod tests {
 
         // Ret:
 
-        assert_eq!(node("ret"), Ok(("", IrNode::Ret)));
-        assert_eq!(node("return"), Ok(("urn", IrNode::Ret))); // Tough luck. Keep your english words away from me!
+        assert_eq!(node("ret"), Ok(("", Instruction::Ret)));
+        assert_eq!(node("return"), Ok(("urn", Instruction::Ret))); // Tough luck. Keep your english words away from me!
 
         // Intrinsic:
 
         assert_eq!(
             node("Intrinsic PRINT_STRING"),
-            Ok(("", IrNode::Intrinsic(Intrinsic::PrintString)))
+            Ok(("", Instruction::Intrinsic(Intrinsic::PrintString)))
         );
         assert_eq!(
             node("INTRINSIC print_int"),
-            Ok(("", IrNode::Intrinsic(Intrinsic::PrintInt)))
+            Ok(("", Instruction::Intrinsic(Intrinsic::PrintInt)))
         );
         assert_eq!(
             node("Intrinsic exit"),
-            Ok(("", IrNode::Intrinsic(Intrinsic::Exit)))
+            Ok(("", Instruction::Intrinsic(Intrinsic::Exit)))
         );
 
         assert!(node("intrinsic not_an_intrinsic").is_err());
@@ -570,21 +570,21 @@ mod tests {
     #[test]
     fn push_pop() {
         // Push:
-        assert_eq!(node("Push 1"), Ok(("", IrNode::Push { reg: 1 })));
-        assert_eq!(node("PUSH 2020"), Ok(("", IrNode::Push { reg: 2020 })));
+        assert_eq!(node("Push 1"), Ok(("", Instruction::Push { reg: 1 })));
+        assert_eq!(node("PUSH 2020"), Ok(("", Instruction::Push { reg: 2020 })));
 
         assert!(node("PUSH").is_err()); // Bare push not allowed
 
         // Pop:
-        assert_eq!(node("pop -1"), Ok(("", IrNode::Pop { reg: -1 })));
-        assert_eq!(node("poP 2013 "), Ok((" ", IrNode::Pop { reg: 2013 })));
+        assert_eq!(node("pop -1"), Ok(("", Instruction::Pop { reg: -1 })));
+        assert_eq!(node("poP 2013 "), Ok((" ", Instruction::Pop { reg: 2013 })));
 
         assert!(node("POP").is_err()); // Bare pop also not allowed...
     }
 
     #[test]
     fn simple_program() {
-        assert_eq!(program("band"), Ok(vec![IrNode::Band]));
+        assert_eq!(program("band"), Ok(vec![Instruction::Band]));
         assert_eq!(
             program(
                 "band\n\
@@ -592,7 +592,7 @@ mod tests {
                 and\n\
                 xor"
             ), // Works without terminating newline.
-            Ok(vec![IrNode::Band, IrNode::Bor, IrNode::And, IrNode::Xor,])
+            Ok(vec![Instruction::Band, Instruction::Bor, Instruction::And, Instruction::Xor,])
         );
         assert_eq!(
             program(
@@ -601,7 +601,7 @@ mod tests {
                      And\n\
                      xOR\n"
             ), // Also works with terminating newline.
-            Ok(vec![IrNode::Band, IrNode::Bor, IrNode::And, IrNode::Xor,])
+            Ok(vec![Instruction::Band, Instruction::Bor, Instruction::And, Instruction::Xor,])
         );
 
         // Other whitespace:
@@ -612,7 +612,7 @@ mod tests {
                      And \n     \
                      \txOR \n"
             ), // Also works with terminating newline.
-            Ok(vec![IrNode::Band, IrNode::Bor, IrNode::And, IrNode::Xor,])
+            Ok(vec![Instruction::Band, Instruction::Bor, Instruction::And, Instruction::Xor,])
         );
     }
 
@@ -623,7 +623,7 @@ mod tests {
                 "Iconst 500\n\
                  Iconst 0"
             ),
-            Ok(vec![IrNode::Iconst(500), IrNode::Iconst(0),])
+            Ok(vec![Instruction::Iconst(500), Instruction::Iconst(0),])
         );
 
         assert_eq!(
@@ -635,11 +635,11 @@ mod tests {
                  Iconst 20"
             ),
             Ok(vec![
-                IrNode::Sconst("Hello I'm a string with no escapes".into()),
-                IrNode::Sconst("with double quotes \" ".into()),
-                IrNode::Sconst("with \n newlines \n".into()),
-                IrNode::Sconst("\\ with backslashes \\".into()),
-                IrNode::Iconst(20),
+                Instruction::Sconst("Hello I'm a string with no escapes".into()),
+                Instruction::Sconst("with double quotes \" ".into()),
+                Instruction::Sconst("with \n newlines \n".into()),
+                Instruction::Sconst("\\ with backslashes \\".into()),
+                Instruction::Iconst(20),
             ])
         );
     }
@@ -715,13 +715,13 @@ mod tests {
                 "##
             ),
             Ok(vec![
-                IrNode::Sconst("Have a string, why don'tcha ".into()),
-                IrNode::Iconst(-30),
-                IrNode::Label(Label::named("L0")),
-                IrNode::Sconst("\"Around and around, good fun\"".into()),
-                IrNode::Jump(Label::named("L0")),
-                IrNode::BranchZero(Label::named("L1")),
-                IrNode::Label(Label::named("L1")),
+                Instruction::Sconst("Have a string, why don'tcha ".into()),
+                Instruction::Iconst(-30),
+                Instruction::Label(Label::named("L0")),
+                Instruction::Sconst("\"Around and around, good fun\"".into()),
+                Instruction::Jump(Label::named("L0")),
+                Instruction::BranchZero(Label::named("L1")),
+                Instruction::Label(Label::named("L1")),
             ])
         );
     }
@@ -746,13 +746,13 @@ mod tests {
                  Intrinsic exit"
             ),
             Ok(vec![
-                IrNode::Iconst(40),
-                IrNode::Jump(Label::named("L1")),
-                IrNode::Iconst(20),
-                IrNode::Iconst(40),
-                IrNode::Add,
-                IrNode::Intrinsic(Intrinsic::PrintInt),
-                IrNode::Intrinsic(Intrinsic::Exit)
+                Instruction::Iconst(40),
+                Instruction::Jump(Label::named("L1")),
+                Instruction::Iconst(20),
+                Instruction::Iconst(40),
+                Instruction::Add,
+                Instruction::Intrinsic(Intrinsic::PrintInt),
+                Instruction::Intrinsic(Intrinsic::Exit)
             ])
         );
     }

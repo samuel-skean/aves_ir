@@ -1,9 +1,9 @@
 use crate::bindings::*;
 use std::io;
 
-use crate::ir_definition::{Intrinsic, IrNode, Label};
+use crate::ir_definition::{Intrinsic, Instruction, Label};
 
-pub fn write_bytecode(ir_list: &[IrNode], out: &mut impl io::Write) -> io::Result<()> {
+pub fn write_bytecode(ir_list: &[Instruction], out: &mut impl io::Write) -> io::Result<()> {
     for node in ir_list {
         node.write_bytecode(out)?;
     }
@@ -78,33 +78,33 @@ impl WriteBytecode for Intrinsic {
 }
 // TODO: consider creating newtyping bindings for enums in ir.c instead, and then
 // importing all the variants, to cut down on noise.
-impl WriteBytecode for IrNode {
+impl WriteBytecode for Instruction {
     fn write_bytecode(&self, out: &mut impl io::Write) -> io::Result<()> {
         match self {
-            IrNode::Nop => ir_op_ir_nop.write_bytecode(out),
-            IrNode::Iconst(num) => {
+            Instruction::Nop => ir_op_ir_nop.write_bytecode(out),
+            Instruction::Iconst(num) => {
                 ir_op_ir_iconst.write_bytecode(out)?;
                 num.write_bytecode(out)
             }
-            IrNode::Sconst(text) => {
+            Instruction::Sconst(text) => {
                 ir_op_ir_sconst.write_bytecode(out)?;
                 text.as_str().write_bytecode(out)
             }
-            IrNode::Add => ir_op_ir_add.write_bytecode(out),
-            IrNode::Sub => ir_op_ir_sub.write_bytecode(out),
-            IrNode::Mul => ir_op_ir_mul.write_bytecode(out),
-            IrNode::Div => ir_op_ir_div.write_bytecode(out),
-            IrNode::Mod => ir_op_ir_mod.write_bytecode(out),
-            IrNode::Bor => ir_op_ir_bor.write_bytecode(out),
-            IrNode::Band => ir_op_ir_band.write_bytecode(out),
-            IrNode::Xor => ir_op_ir_xor.write_bytecode(out),
-            IrNode::Or => ir_op_ir_or.write_bytecode(out),
-            IrNode::And => ir_op_ir_and.write_bytecode(out),
-            IrNode::Eq => ir_op_ir_eq.write_bytecode(out),
-            IrNode::Lt => ir_op_ir_lt.write_bytecode(out),
-            IrNode::Gt => ir_op_ir_gt.write_bytecode(out),
-            IrNode::Not => ir_op_ir_not.write_bytecode(out),
-            IrNode::ReserveString {
+            Instruction::Add => ir_op_ir_add.write_bytecode(out),
+            Instruction::Sub => ir_op_ir_sub.write_bytecode(out),
+            Instruction::Mul => ir_op_ir_mul.write_bytecode(out),
+            Instruction::Div => ir_op_ir_div.write_bytecode(out),
+            Instruction::Mod => ir_op_ir_mod.write_bytecode(out),
+            Instruction::Bor => ir_op_ir_bor.write_bytecode(out),
+            Instruction::Band => ir_op_ir_band.write_bytecode(out),
+            Instruction::Xor => ir_op_ir_xor.write_bytecode(out),
+            Instruction::Or => ir_op_ir_or.write_bytecode(out),
+            Instruction::And => ir_op_ir_and.write_bytecode(out),
+            Instruction::Eq => ir_op_ir_eq.write_bytecode(out),
+            Instruction::Lt => ir_op_ir_lt.write_bytecode(out),
+            Instruction::Gt => ir_op_ir_gt.write_bytecode(out),
+            Instruction::Not => ir_op_ir_not.write_bytecode(out),
+            Instruction::ReserveString {
                 size,
                 name,
                 initial_value,
@@ -114,61 +114,61 @@ impl WriteBytecode for IrNode {
                 initial_value.as_str().write_bytecode(out)?;
                 size.write_bytecode(out)
             }
-            IrNode::ReserveInt { name } => {
+            Instruction::ReserveInt { name } => {
                 ir_op_ir_reserve.write_bytecode(out)?;
                 name.as_str().write_bytecode(out)?;
                 // Write the size 0, and nothing else for the string, because the string is conceptually null.
                 0.write_bytecode(out)?;
                 4.write_bytecode(out)
             }
-            IrNode::Read(name) => {
+            Instruction::Read(name) => {
                 ir_op_ir_read.write_bytecode(out)?;
                 name.as_str().write_bytecode(out)
             }
-            IrNode::Write(name) => {
+            Instruction::Write(name) => {
                 ir_op_ir_write.write_bytecode(out)?;
                 name.as_str().write_bytecode(out)
             }
-            IrNode::ArgLocalRead(index) => {
+            Instruction::ArgLocalRead(index) => {
                 ir_op_ir_arglocal_read.write_bytecode(out)?;
                 index.write_bytecode(out)
             }
-            IrNode::ArgLocalWrite(index) => {
+            Instruction::ArgLocalWrite(index) => {
                 ir_op_ir_arglocal_write.write_bytecode(out)?;
                 index.write_bytecode(out)
             }
-            IrNode::Label(label) => {
+            Instruction::Label(label) => {
                 ir_op_ir_lbl.write_bytecode(out)?;
                 label.write_bytecode(out)
             }
-            IrNode::Jump(label) => {
+            Instruction::Jump(label) => {
                 ir_op_ir_jump.write_bytecode(out)?;
                 label.write_bytecode(out)
             }
-            IrNode::BranchZero(label) => {
+            Instruction::BranchZero(label) => {
                 ir_op_ir_branchzero.write_bytecode(out)?;
                 label.write_bytecode(out)
             }
-            IrNode::Function { label, num_locs } => {
+            Instruction::Function { label, num_locs } => {
                 ir_op_ir_function.write_bytecode(out)?;
                 label.write_bytecode(out)?;
                 num_locs.write_bytecode(out)
             }
-            IrNode::Call { label, num_args } => {
+            Instruction::Call { label, num_args } => {
                 ir_op_ir_call.write_bytecode(out)?;
                 label.write_bytecode(out)?;
                 num_args.write_bytecode(out)
             }
-            IrNode::Ret => ir_op_ir_ret.write_bytecode(out),
-            IrNode::Intrinsic(intrinsic) => {
+            Instruction::Ret => ir_op_ir_ret.write_bytecode(out),
+            Instruction::Intrinsic(intrinsic) => {
                 ir_op_ir_intrinsic.write_bytecode(out)?;
                 intrinsic.write_bytecode(out)
             }
-            IrNode::Push { reg } => {
+            Instruction::Push { reg } => {
                 ir_op_ir_push.write_bytecode(out)?;
                 reg.write_bytecode(out)
             }
-            IrNode::Pop { reg } => {
+            Instruction::Pop { reg } => {
                 ir_op_ir_pop.write_bytecode(out)?;
                 reg.write_bytecode(out)
             }

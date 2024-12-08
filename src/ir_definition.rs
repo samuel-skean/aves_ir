@@ -20,7 +20,7 @@ pub enum Intrinsic {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum IrNode {
+pub enum Instruction {
     Nop,
 
     // Arithmetic/logic operations:
@@ -56,7 +56,7 @@ pub enum IrNode {
     ArgLocalWrite(u64),
 
     // Control-flow
-    Label(Label),
+    Label(Label), // I guess labels are a kind of instruction - a no-op that also indicates where things are.
     Jump(Label),
     BranchZero(Label),
 
