@@ -102,7 +102,7 @@ fn main() -> io::Result<()> {
                 if print {
                     bindings::ir_list_print(c_ir_node);
                 } else {
-                    bindings::interpret(c_ir_node);
+                    bindings::interpret(c_ir_node, std::ptr::null_mut());
                 }
                 bindings::free_list_ir(c_ir_node);
             }
