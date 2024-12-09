@@ -60,7 +60,7 @@ impl TryFrom<*mut bindings::stack_node> for ProgramStack {
 pub fn interpret<'program>(program: &'program [Instruction]) -> Result<(String, ProgramStack), IpcError> {
     let mut child_builder = mitosis::Builder::new();
     child_builder.stdin(Stdio::piped()).stdout(Stdio::piped());
-    let mut child = child_builder.spawn((), |()| unsafe { interpret_c() });
+    let mut child = child_builder.spawn((), |()| unsafe { interpret_in_c() });
 
     let mut program_output = String::new();
 
@@ -80,7 +80,7 @@ pub fn interpret<'program>(program: &'program [Instruction]) -> Result<(String, 
 }
 
 
-unsafe fn interpret_c() -> ProgramStack {
+unsafe fn interpret_in_c() -> ProgramStack {
     let c_ir_node = bindings::ir_list_read(0);
     // TODO: Somehow encode that the head of this owns the list.
     let mut c_program_stack: *mut bindings::stack_node = null_mut();
