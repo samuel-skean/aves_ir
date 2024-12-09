@@ -57,7 +57,7 @@ impl TryFrom<*mut bindings::stack_node> for ProgramStack {
     }
 }
 
-pub fn interpret<'program, 'stack>(program: &'program [Instruction]) -> Result<(String, ProgramStack), IpcError> {
+pub fn interpret<'program>(program: &'program [Instruction]) -> Result<(String, ProgramStack), IpcError> {
     let mut child_builder = mitosis::Builder::new();
     child_builder.stdin(Stdio::piped()).stdout(Stdio::piped());
     let mut child = child_builder.spawn((), |()| unsafe { interpret_c() });
