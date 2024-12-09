@@ -14,7 +14,7 @@ EXEC=interp
 COMPILER=bluejaycc
 TEST_DIR=tests
 IR_SAMPLES_DIR=ir/from_a4
-SHOULD_EXTRACT_EXPECTED_OUTPUT=true # Only extract *program* output.
+SHOULD_EXTRACT_EXPECTED_OUTPUT=true # Only set this to true when there is *program* output to extract.
 
 make clean && make
 
