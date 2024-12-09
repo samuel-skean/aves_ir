@@ -2,10 +2,9 @@ use std::{
     fs::File,
     io::{self, stdin, BufReader, BufWriter, Read},
     os::fd::AsRawFd as _,
-    process::{self, Stdio},
 };
 
-use aves_ir::{assemble, bindings, write_bytecode::write_bytecode};
+use aves_ir::{assemble, bindings, interpret::interpret, write_bytecode::write_bytecode};
 use clap::Parser;
 
 // TODO: This should have two mutually exclusive options: interpret and print.
@@ -28,6 +27,10 @@ struct CliOptions {
 }
 
 fn main() -> io::Result<()> {
+    #[cfg(target_os = "macos")]
+    compile_error!("Mitosis does not work on macOS, at least on modern versions.");
+    mitosis::init();
+
     let options = CliOptions::parse();
 
     match options {
@@ -62,25 +65,21 @@ fn main() -> io::Result<()> {
                 text_program
             };
 
-            // It is not ideal that we're sometimes writing the bytecode twice when we could be doing so once.
-            let prog = assemble::program(&text_program).expect("Parsing error.");
+            // It is not ideal that we're sometimes writing the bytecode twice when we could be doing so once (we're doing so once here, once in interpret.rs).
+            let program = assemble::program(&text_program).expect("Parsing error.");
             if let Some(output_bytecode_path) = output_bytecode_path {
                 let mut output_bytecode_file = BufWriter::new(File::create(output_bytecode_path)?);
-                write_bytecode(&prog, &mut output_bytecode_file)?;
+                write_bytecode(&program, &mut output_bytecode_file)?;
             }
 
-            let mut child_cmd = process::Command::new(
-                std::env::current_exe().expect("Can't find current executable."),
-            );
             if print {
-                child_cmd.arg("--print");
+                return Ok(()); // TODO: Actually print.
             }
-            child_cmd.args(["--bytecode", "-"]);
-            let mut child = child_cmd.stdin(Stdio::piped()).spawn()?;
-            let mut child_stdin = child.stdin.as_ref().expect("Could not get child's stdin.");
-            write_bytecode(&prog, &mut child_stdin)
-                .expect("Could not write bytecode into child's stdin.");
-            child.wait().expect("Child process (interpreter) failed.");
+
+            let (output, stack) = interpret(&program).expect("There was an IPC error!");
+
+            io::copy(&mut output.as_bytes(), &mut io::stdout())?;
+            eprintln!("The stack was: {:?}", stack);
         }
         CliOptions {
             bytecode_path: Some(bytecode_path),
