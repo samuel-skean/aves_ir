@@ -6,6 +6,32 @@
     "configurations": [
         {
             "type": "lldb",
+            "request": "attach",
+            "name": "Attach",
+            "pid": "${command:pickMyProcess}" // use ${command:pickProcess} to pick other users' processes
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            // TODO: Change names when you change the file.
+            "name": "Debug executable 'aves_interpreter'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=aves_interpreter",
+                    "--package=aves_ir"
+                ],
+                "filter": {
+                    "name": "aves_interpreter",
+                    "kind": "bin"
+                }
+            },
+            "args": ["--print", "--text", "printed.aves_text", "--output-bytecode", "rust_out.aves_bytecode"],
+            "cwd": "${workspaceFolder}"
+        },
+        
+        {
+            "type": "lldb",
             "request": "launch",
             "name": "Debug unit tests in library 'aves_ir'",
             "cargo": {
