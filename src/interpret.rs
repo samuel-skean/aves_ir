@@ -51,7 +51,11 @@ impl TryFrom<*mut bindings::stack_node> for ProgramStack {
             // # SAFETY: c_stack_node is not null.
             unsafe { curr = (*curr).next; }
         };
+        // TODO: This should not be here! Use a destructor for goodness sake!
         unsafe { bindings::free_stack(c_stack_head); }
+        // This still involves copying the items in the Vec. Not the nicest.
+        // Perhaps we should just have a VecDeque in ProgramStack, and only
+        // expose Vec-like methods?
         Ok(ProgramStack(Vec::from(stack_items)))
 
     }
