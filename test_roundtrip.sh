@@ -8,8 +8,10 @@
 set -u # Don't let me refer to uninitialized variables.
 set -e # Fail immediately when any command fails.
 
-PRINT='cargo run --bin aves_interpreter -- --print --bytecode'
-ASSEMBLE='cargo run --bin aves_interpreter -- --print --text' # TODO: Bad variable name.
+cargo build
+BIN_PATH='./target/debug/aves_interpreter'
+PRINT="${BIN_PATH} --print --bytecode"
+ASSEMBLE="${BIN_PATH} --print --text" # TODO: Bad variable name.
 PRINTED='printed.aves_text'
 REASSEMBLED='rust_out.aves_bytecode'
 XXD_BYTECODE_DIFFERENCE=xxd_bytecode_difference

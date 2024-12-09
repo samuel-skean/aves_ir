@@ -13,11 +13,11 @@ fn main() {
         .expect("cannot canonicalize path");
 
     // This is the path to the `c` headers file.
-    let headers_path = libdir_path.join("include");
+    let include_path = libdir_path.join("include");
     // Is the solution to not owning this necessarily something without a lambda?
-    let header_file_paths = headers_path
+    let header_file_paths = include_path
         .read_dir()
-        .expect("headers was not a directory")
+        .expect("c_code/include was not a directory")
         .map(|e| {
             e.expect("Something wrong with a header file's directory entry.")
                 .path()
@@ -50,7 +50,7 @@ fn main() {
 
     let mut build = cc::Build::new();
     build.files(src_file_paths)
-        .include(headers_path)
+        .include(include_path)
         .out_dir(build_path)
         .flag("-O0")
         .flag("-Wall")
