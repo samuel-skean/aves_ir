@@ -3,8 +3,8 @@ use std::io;
 
 use crate::ir_definition::{Intrinsic, Instruction, Label};
 
-pub fn write_bytecode(ir_list: &[Instruction], out: &mut impl io::Write) -> io::Result<()> {
-    for node in ir_list {
+pub fn write_bytecode(program: &[Instruction], out: &mut impl io::Write) -> io::Result<()> {
+    for node in program {
         node.write_bytecode(out)?;
     }
     Ok(())
