@@ -6,7 +6,13 @@ use std::{
 };
 
 use aves_ir::{assemble, bindings, write_bytecode::write_bytecode};
-use clap::Parser;
+use clap::{Parser, Subcommand};
+
+#[derive(Subcommand, Clone, PartialEq, Eq)]
+enum Tool {
+    Interpret,
+    Print,
+}
 
 // TODO: This should have two mutually exclusive options: interpret and print.
 // These should be mutually exclusive since they both print to standard out.
@@ -23,11 +29,11 @@ struct CliOptions {
     text_path: Option<std::path::PathBuf>,
     #[arg(short, long = "output-bytecode", requires("text_path"))]
     output_bytecode_path: Option<std::path::PathBuf>,
-    #[arg(short, long)]
-    print: bool,
+    #[command(subcommand)]
+    tool: Option<Tool>,
 }
 
-fn main() -> io::Result<()> {
+fn main() -> io::Result<process::ExitCode> {
     let options = CliOptions::parse();
 
     match options {
@@ -49,7 +55,7 @@ fn main() -> io::Result<()> {
             bytecode_path: None,
             text_path: Some(text_path),
             output_bytecode_path,
-            print,
+            tool,
         } => {
             // STRETCH: Make this streaming.
             let mut text_program = String::new();
@@ -72,10 +78,12 @@ fn main() -> io::Result<()> {
             let mut child_cmd = process::Command::new(
                 std::env::current_exe().expect("Can't find current executable."),
             );
-            if print {
-                child_cmd.arg("--print");
-            }
             child_cmd.args(["--bytecode", "-"]);
+            match tool {
+                Some(Tool::Interpret) => { child_cmd.arg("interpret"); }
+                Some(Tool::Print) => { child_cmd.arg("print"); }
+                None => { }
+            };
             let mut child = child_cmd.stdin(Stdio::piped()).spawn()?;
             let mut child_stdin = child.stdin.as_ref().expect("Could not get child's stdin.");
             write_bytecode(&prog, &mut child_stdin)
@@ -85,7 +93,7 @@ fn main() -> io::Result<()> {
         CliOptions {
             bytecode_path: Some(bytecode_path),
             text_path: None,
-            print,
+            tool,
             ..
         } => {
             let bytecode_file;
@@ -98,16 +106,27 @@ fn main() -> io::Result<()> {
                 bytecode_file = File::open(bytecode_path)?;
                 bytecode_file.as_raw_fd()
             };
-            unsafe {
-                let c_ir_node = bindings::ir_list_read(bytecode_fd);
-                if print {
-                    bindings::ir_list_print(c_ir_node);
-                } else {
-                    bindings::interpret(c_ir_node);
+            if let Some(tool) = tool {
+                unsafe {
+                    let c_ir_node = bindings::ir_list_read(bytecode_fd);
+                    // TODO: Actually return the return code. This may be
+                    // trickier than it seems because of how negative numbers
+                    // are handled.
+                    match tool {
+                        Tool::Interpret => {
+                            // Using `as` here looks weird, but I think it's
+                            // exactly what the shell will (usually) do.
+                            let retcode = bindings::interpret(c_ir_node) as u8;
+                            bindings::free_list_ir(c_ir_node);
+                            return Ok(retcode.into());
+                        }
+                        Tool::Print => { bindings::ir_list_print(c_ir_node); }
+                    }
+                    bindings::free_list_ir(c_ir_node);
                 }
-                bindings::free_list_ir(c_ir_node);
             }
+            
         }
     };
-    Ok(())
+    Ok(process::ExitCode::SUCCESS)
 }

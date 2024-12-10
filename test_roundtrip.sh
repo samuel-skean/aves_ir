@@ -8,8 +8,8 @@
 set -u # Don't let me refer to uninitialized variables.
 set -e # Fail immediately when any command fails.
 
-PRINT='cargo run --bin aves_interpreter -- --print --bytecode'
-ASSEMBLE='cargo run --bin aves_interpreter -- --print --text' # TODO: Bad variable name.
+cargo build
+AVES_BIN_PATH='./target/debug/aves_interpreter'
 PRINTED='printed.aves_text'
 REASSEMBLED='rust_out.aves_bytecode'
 XXD_BYTECODE_DIFFERENCE=xxd_bytecode_difference
@@ -22,9 +22,9 @@ RESET='\033[0m'
 for ORIGINAL in $(find $IR_DIR -type f | grep ".aves_bytecode$" | sort)
 do
     echo "Checking $ORIGINAL"
-    $PRINT $ORIGINAL > $PRINTED 2> /dev/null
-    $ASSEMBLE $PRINTED --output-bytecode $REASSEMBLED &> /dev/null
-    diff <($PRINT $REASSEMBLED 2> /dev/null) $PRINTED > $TEXT_DIFFERENCE
+    $AVES_BIN_PATH --bytecode $ORIGINAL print > $PRINTED 2> /dev/null
+    $AVES_BIN_PATH --text $PRINTED --output-bytecode $REASSEMBLED print &> /dev/null
+    diff <($AVES_BIN_PATH --bytecode $REASSEMBLED print 2> /dev/null) $PRINTED > $TEXT_DIFFERENCE
     # Is diffing the result of xxd always gonna work?
     diff <(xxd $REASSEMBLED) <(xxd $ORIGINAL) > $XXD_BYTECODE_DIFFERENCE
     

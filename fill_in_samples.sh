@@ -16,6 +16,8 @@
 # ".expected" file already exists, the file is not interpreted and this is
 # indicated on stderr.
 
+# TODO: Update for new command line interface.
+
 PRINT='cargo run --bin aves_interpreter -- --print --bytecode'
 ASSEMBLE='cargo run --bin aves_interpreter -- --print --text' # TODO: Bad name.
 BYTECODE_EXTENSION=".aves_bytecode"
