@@ -27,8 +27,6 @@ struct CliOptions {
 }
 
 fn main() -> io::Result<()> {
-    #[cfg(target_os = "macos")]
-    compile_error!("Mitosis does not work on macOS, at least on modern versions.");
     mitosis::init();
 
     let options = CliOptions::parse();
