@@ -17,8 +17,10 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 
 fn inside_string(input: &str) -> IResult<&str, String> {
     use nom::bytes::complete::tag;
-    // STRETCH: Okay, there's gotta be a better way. Why do I need to use opt
-    // for this to work correctly within string_literal?
+    // The `opt` is necessary because escaped_transform must consume at least
+    // one character. If it sees a '"' (the end of a string), it fails. If we
+    // were to make it accept that, then the `string_literal` rule couldn't
+    // consume it!
     map(
         opt(escaped_transform(
             none_of(r#"\""#),
