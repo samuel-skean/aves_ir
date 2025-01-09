@@ -17,8 +17,10 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 
 fn inside_string(input: &str) -> IResult<&str, String> {
     use nom::bytes::complete::tag;
-    // STRETCH: Okay, there's gotta be a better way. Why do I need to use opt
-    // for this to work correctly within string_literal?
+    // The `opt` is necessary because escaped_transform must consume at least
+    // one character. If it sees a '"' (the end of a string), it fails. If we
+    // were to make it accept that, then the `string_literal` rule couldn't
+    // consume it!
     map(
         opt(escaped_transform(
             none_of(r#"\""#),
@@ -268,17 +270,18 @@ mod tests {
             inside_string(r#"I don't include the unescaped quote.""#),
             Ok((r#"""#, "I don't include the unescaped quote.".into()))
         );
+
         assert_eq!(
-            inside_string(r#"I don't get matched because I have an invalid escape sequence: \n "#),
+            inside_string(r#"Invalid escape sequnces are simply untransformed: \n "#),
             Ok((
-                r#"I don't get matched because I have an invalid escape sequence: \n "#,
+                r#"Invalid escape sequnces are simply untransformed: \n "#,
                 "".into()
             ))
         );
         assert_eq!(
-            inside_string(r#"I don't get matched because I end in a backslash \"#),
+            inside_string(r#"Despite ending in a backslash, I get matched fine. This will not be accepted by the outer rule, string_literal. \"#),
             Ok((
-                r#"I don't get matched because I end in a backslash \"#,
+                r#"Despite ending in a backslash, I get matched fine. This will not be accepted by the outer rule, string_literal. \"#,
                 "".into()
             ))
         );
