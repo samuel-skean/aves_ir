@@ -268,17 +268,18 @@ mod tests {
             inside_string(r#"I don't include the unescaped quote.""#),
             Ok((r#"""#, "I don't include the unescaped quote.".into()))
         );
+
         assert_eq!(
-            inside_string(r#"I don't get matched because I have an invalid escape sequence: \n "#),
+            inside_string(r#"Invalid escape sequnces are simply untransformed: \n "#),
             Ok((
-                r#"I don't get matched because I have an invalid escape sequence: \n "#,
+                r#"Invalid escape sequnces are simply untransformed: \n "#,
                 "".into()
             ))
         );
         assert_eq!(
-            inside_string(r#"I don't get matched because I end in a backslash \"#),
+            inside_string(r#"Despite ending in a backslash, I get matched fine. This will not be accepted by the outer rule, string_literal. \"#),
             Ok((
-                r#"I don't get matched because I end in a backslash \"#,
+                r#"Despite ending in a backslash, I get matched fine. This will not be accepted by the outer rule, string_literal. \"#,
                 "".into()
             ))
         );
