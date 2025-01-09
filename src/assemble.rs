@@ -20,7 +20,12 @@ fn inside_string(input: &str) -> IResult<&str, String> {
     // The `opt` is necessary because escaped_transform must consume at least
     // one character. If it sees a '"' (the end of a string), it fails. If we
     // were to make it accept that, then the `string_literal` rule couldn't
-    // consume it!
+    // consume it! 
+    //
+    // NOTE: `escaped_transform` allows "invalid" escape sequences through
+    // unscathed. Perhaps that's one of the reasons nom doesn't use it in their
+    // example on parsing strings:
+    // https://github.com/rust-bakery/nom/blob/main/src/lib.rs#L35.
     map(
         opt(escaped_transform(
             none_of(r#"\""#),
