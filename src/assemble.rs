@@ -253,7 +253,13 @@ mod tests {
 
     #[test]
     fn inside_string_test() {
+
         assert_eq!(inside_string(""), Ok(("", "".into())));
+
+        // This is why the `opt` is necessary. See code for more detailed
+        // comment.
+        assert_eq!(inside_string(r#"""#), Ok(("\"", "".into())) );
+
         assert_eq!(inside_string(r#"\""#), Ok(("", r#"""#.into())));
         assert_eq!(
             inside_string(r#"I have some literal quotes \" \"."#),
